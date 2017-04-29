@@ -1,0 +1,51 @@
+A programação funcional é baseada no uso de funções. Ou seja, na
+aplicação de funções a valores.
+
+O fato de que há ações --- ou comandos, que podem causar um efeito
+colateral, ou seja, uma "mudança de estado" --- não é um aspecto
+problemático para o estilo de programação funcional. Demorou muito
+tempo passou (várias décadas) para que isso fosse elucidado. Porque
+não é problemátco? A razão é: o resultado de uma ação deve ser
+distinguido da própria ação. Como? Usando tipos: em uma linguagem
+tipdada, o tipo da ação deve ser marcado (com um construtor de tipo),
+de modo a indicar que se trata de uma ação e identificar também o tipo
+do valor, se existir, que é retornado pela execução dessa ação.
+
+Essencialmemte, é isso. Por exemplo, \getChar\ deve ter tipo diferente
+de \Char; o tipo de \getChar\ deve ser algo como \IO\ \Char: a parte
+(o construtor) \IO\ indica que se trata de uma ação, e a parte (tipo)
+\Char\ indica que o resultado de realizar a ação retorna um valor de
+tipo \Char. O tipo \Char\ é, assim, bastante diferente do tipo de
+\getChar.
+
+A marcação de um valor como uma ação, mediante atribuição do tipo
+desse valor, permite tratar ações adequadamente em programação
+funcional, considerando que a linguagem é tipada. Falaremos mais sobre
+isso no Capítulo \ref{Monads}.
+
+Antes disso, porém, em um curso de programação funcional, é importante
+exercitar o uso de funções. Para isso, é importante considerar que
+apenas o fato de "ser baseada no uso de funções" não esclarece a razão
+da importância, principalmente no contexto atual, da programação
+funcional. É preciso considerar ainda o seguinte.
+
+Primeiramente, é preciso considerar que funções são, em geral,
+definidas com base em {\em estruturas de dados definidas
+recursivamente}. É essa definição recursiva dos tipos dos dados,
+realizada de maneira simples e natural, em geral mediante a definição
+de tipos algébricos recursivos, que torna a programação funcional
+simples e adequada para expressão de soluções de problemas ou
+execuções de tarefas. Este aspecto não é usualmente colocado com o
+destaque e primordialidade que merece, sendo enfatizado em geral
+apenas o fato de que as definições de funções são recursivas.
+
+Em segundo lugar, funções podem ser ``de ordem superior'', ou seja,
+podem receber e retornar valores que são funções. Isso possibilita a
+definição de funções expressivas, que podem ser usadas para diversas
+situações, desde as mais simples e mais gerais (até as mais complexas
+e específicas). A definição e uso de funções de ordem superior é a
+parte principal do treinamento e do que é exercitado na maior parte
+dos cursos introdutórios de programação funcional.
+
+
+

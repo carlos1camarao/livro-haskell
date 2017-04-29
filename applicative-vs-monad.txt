@@ -1,0 +1,56 @@
+Considere Functor, Applicative e Monad como "abstrações" (classes para
+aplicação) de funções dentro de dados encapsulados:
+
+  1. class Functor f where
+       fmap:: (a->b) -> f a -> f b
+
+     fmap g fa permite aplicar função (g) em um valor encapsulado fa
+     (obtendo o resultado depois da aplicação encapsulado).
+
+  2. class Functor f => Applicative f where
+       pure  :: a -> f a
+       (<*>) :: f (a -> b) -> f a -> f b
+
+      (<*>) fg fa é similar a fmap: a diferença é que a função
+      aplicada (fg) também está encapsulada. O efeito é, novamente,
+      apenas aplicar a função ao valor encapsulado (obtendo o
+      resultado encapsulado).
+
+      pure apenas encapsula um valor (possivelmente, funcional).
+
+   3. class Applicative f => Monad f where
+        return :: a -> f a
+	(>>=)  :: f a -> (a -> f b) -> f b
+
+      return é o mesmo que pure.
+
+      (>>=) fa g recebe valor encapsulado (fa) e passa o valor
+      *desencapsulado* (a) à função g, mas exige que o resultado de g
+      seja um valor encapsulado.
+
+É importante notar que o uso de funções com efeitos colaterais por
+meio dessas funções garante que o resultado final obtido esteja sempre
+encapsulado; o encapsulamento (com o construtor IO, ou com o
+construtor ST) também está encapsulado. É o encapsulamento e a
+garantia de que os valores finais obtidos vão estar sempre
+encapsulados que possibilita a manipulação de funções com efeito
+colateral em uma linguagem pura.
+
+É isso. Acho que a situação fica meio obscura, na literatura.
+
+Por exemplo, considere as duas questões seguintes (não considerando a
+hierarquia predefinida de classes em Haskell):
+
+    1. para toda implementação de um funtor aplicativo existe uma
+       implementação de uma mônada que tem comportamento equivalente?
+
+    2. para toda implementação de uma mônada existe uma implementação
+       de um funtor aplicativo que tem comportamento equivalente?
+
+McBride e Patterson escrevem não e sim (http://strictlypositive.org/Idiom.pdf);
+Lindley, Wadler e Yallop eacrevem sim e não
+(http://homepages.inf.ed.ac.uk/wadler/papers/arrows-and-idioms/arrows-and-idioms.pdf).
+
+Na minha visão, não é possível fazer implementação de FreshMonad a
+seguir com Applicative apenas.
+

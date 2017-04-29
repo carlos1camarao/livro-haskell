@@ -1,0 +1,414 @@
+\chapter{Funções de ordem superior}
+
+Funções de ordem superior como \map\ e \filter\ permitem a
+implementação de operações comuns em estruturas de dados: aplicar uma
+função a todos os elementos da estrutura de dados e filtrar os
+elementos que satisfazem a um predicado.
+
+No entanto, estes são casos especiais de uma operação mais expressiva,
+chamada de {\em fold} (ou {\em reduce\/}), que permite obter um
+resultado pela aplicação de uma função binária aos elementos de uma
+estrutura de dados para obtenção de um resultado final, a partir de um
+valor inicial.
+
+Vamos trabalhar nestas notas de aula com {\em fold\/}s sobre listas,
+para as quais podemos ter \ina{foldr} (``fold right'', i.e. \ina{fold}
+sobre os elementos da lista da direita para a esquerda, em outras
+palavras, do último até o primeiro elemento da lista) e \ina{foldl}
+(``fold left'', i.e. \ina{fold} dos elementos da lista da esquerda
+para a direita, em outras palavras, do primeiro até o último
+elemento).
+
+\section{\foldr}
+
+Consideremos primeiro \ina{foldr}. O tipo dessa função é:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+  (a -> b -> b) -> b -> [a] -> b}
+\end{alg}
+\end{tabular}
+\end{center}
+    
+\ina{foldr f z} aplicado a uma lista {\tt [$x_1$, $\ldots$, $x_n$]}
+fornece o resultado:
+
+\begin{equation}
+  x_1\: \symbol{96}f\,\symbol{96}\: (\ldots\: (x_{n-1}\: \symbol{96}f\,\symbol{96}\: (x_n\: \symbol{96}f\,\symbol{96}\: z))\ldots)
+  \label{comportamento-foldr}
+\end{equation}
+
+Em outras palavras, o resultado de \ina{foldr f z} aplicado à lista
+{\tt $x_1\:$:$\:$($\ldots$ ($x_n\:$:$\:$[]))} é obtido substituindo
+{\tt []} por \ina{z} e {\tt (:)} por {\tt
+  \symbol{96}\ina{f}\symbol{96}}.
+
+O valor de tipo \ina{b} obtido em aplicações sucessivas de \ina{f} em
+um {\em fold} é chamado de {\em acumulador\/}.
+
+O resultado é calculado da direita para a esquerda, isto é, a primeira
+aplicação é {\tt \ina{f} $x_n$ \ina{z}}, depois {\tt \ina{f} $x_{n-1}$
+  $r_1$}, sendo $r_1$ o resultado obtido por essa primeira aplicação,
+até {\tt \ina{f} $x_1$ $r_{n-1}$}, sendo esse o último e $r_{n-1}$ o
+penúltimo resultado obtido com aplicações de $f$.
+
+\subsection*{Exemplos}
+
+Exemplos básicos de uso de \foldr\ são mostrados a seguir. Procure
+exercitar, definindo você mesmo, antes de ver a definição.
+
+Para isso, pense o seguinte: \foldr\ $f$ $z$ obtém um valor final
+aplicando $f$ a partir do valor inicial $z$. É preciso definir $f$ e
+$z$. Leve em conta que: $f$ recebe um elemento da lista, o resultado
+(de tipo $r$) de fazer \foldr\ no restante da lista, e retorna um
+valor (do mesmo tipo de $r$); $z$ é o valor retornado quando a lista é
+vazia.
+
+É útil também ter em mente como \foldr\ computa seu resultado, como
+mostrado em (\ref{comportamento-foldr}).
+
+\begin{enumerate}
+\item soma de todos os elementos:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.3\textwidth}{white}
+  sum = foldr (+) 0
+\end{alg}
+\end{tabular}
+\end{center}
+
+\item multiplicação de todos os elementos:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.3\textwidth}{white}
+  prod = foldr (*) 1
+\end{alg}
+\end{tabular}
+\end{center}
+
+\item concatenação de todos os elementos (de uma lista de listas):
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.37\textwidth}{white}
+  concat = foldr (++) []
+\end{alg}
+\end{tabular}
+\end{center}
+
+\item conjunção de todos os elementos: 
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.35\textwidth}{white}
+  and = foldr (&&) True
+\end{alg}
+\end{tabular}
+\end{center}
+
+\item disjunção de todos os elementos: 
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.35\textwidth}{white}
+  or = foldr (||) False
+\end{alg}
+\end{tabular}
+\end{center}
+
+\item máximo dos elementos (de uma lista não vazia):
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+  maximum (a:x) = foldr max a x
+\end{alg}
+\end{tabular}
+\end{center}
+
+\item mínimo dos elementos (de uma lista não vazia):
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+  minimum (a:x) = foldr min a x
+\end{alg}
+\end{tabular}
+\end{center}
+
+\item comprimento (número de elementos):
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.45\textwidth}{white}
+  len = foldr (\ _ -> (+1)) 0
+\end{alg}
+\end{tabular}
+\end{center}
+
+\item \map:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.4\textwidth}{white}
+  map f = foldr (:) []
+\end{alg}
+\end{tabular}
+\end{center}
+  
+\item \filter:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.8\textwidth}{white}
+  filter p = foldr (\ a -> if p a then (a:) else id) []
+\end{alg}
+\end{tabular}
+\end{center}
+
+\end{enumerate}
+
+Mais exemplos são mostrados a seguir.
+
+\begin{enumerate}
+
+\item teste de pertinência a lista:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.2\textwidth}{white}
+    elem a = foldr ((||) . (==a)) False
+\end{alg}
+\end{tabular}
+\end{center}
+  
+\item ordenação por inserção: 
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+insertionSort = foldr ins []
+  ins a []      = [a]
+  ins a (b:x)
+    | a <= b    = a:b:x
+    | otherwise = b: ins a x
+\end{alg}
+\end{tabular}
+\end{center}
+
+\item inserção de valor (\ina{k}) entre dois elementos consecutivos de
+  uma lista; na definição de \ina{intersperse} mostrada abaixo, um
+  valor booleano é usado para não inserir \ina{k} após o último
+  elemento:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.8\textwidth}{white}
+intersperse k = fst . foldr consIfTrue ([],(k,False))
+  where consIfTrue a (x,(k,False)) = (a:x  ,(k,True))
+        consIfTrue a (x,(k,b    )) = (a:k:x,(k,b   ))
+\end{alg}
+\end{tabular}
+\end{center}
+
+\end{enumerate}
+
+\section{\foldl}
+
+\ina{foldl f z} aplicado a uma lista {\tt [$x_1$, $\ldots$, $x_n$]} fornece o
+resultado:
+  \[ \texttt{(\ldots ((z \symbol{96}\ina{f}\symbol{96} $x_1$) \symbol{96}\ina{f}\symbol{96} $x_2$) \ldots \symbol{96}\ina{f}\symbol{96} $x_n$)}\]
+
+O tipo de \ina{foldl} é:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+  (b -> a -> b) -> b -> [a] -> b
+\end{alg}
+\end{tabular}
+\end{center}
+
+A função \ina{f} em \ina{foldl f}, ao contrário de \ina{foldr}, recebe
+o ``acumulador'' primeiro, e depois o elemento da lista.
+
+\fold\ é útil em casos (não muito comuns) em que o primeiro argumento
+é não estrito no segundo argumento, ou quando se deseja inverter a
+ordem dos elementos da lista.
+
+Exemplos de uso de \foldl:
+
+\begin{enumerate}
+
+\item inversão da ordem dos elementos da lista:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.2\textwidth}{white}
+    reverse = foldl (flip (:)) []
+\end{alg}
+\end{tabular}
+\end{center}
+
+\item subtração de todos elementos de lista a valor:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.2\textwidth}{white}
+  subtraiTodosDe n = foldl (-) n
+\end{alg}
+\end{tabular}
+\end{center}
+
+\end{enumerate}
+
+\section{Ineficiência da complexidade de espaço da avaliação preguiçosa de \foldl}
+
+Infelizmente, ao contrário da complexidade de tempo, a complexidade de
+espaço da estratégia de avaliação preguiçosa não é ótima. Por exemplo,
+a quantidade de espaço usada para obter o resultado de:
+
+\[ \texttt{\foldl\ $f$ $z$ $x$} \]
+é $O(n)$, onde $n$ é o tamanho da lista, quando $f$ é estrita.  A
+complexidade de espaço usada para obter o resultado de
+$\texttt{\foldl\ $f$ $z$ $x$}$ é também $O(n)$ quando $f$ é
+estrita. Se a lista for grande, isso poderá acarretar problema de
+falta de espaço suficiente para obter o resultado.
+
+No entanto, no caso de \foldl, a complexidade de espaço usada pela
+estratégia de avaliação estrita é $O(1)$. Isso ocorre, no cálculo de
+$\texttt{\foldl\ $f$ $z$ $x$}$, sendo {\tt $x$ $=$
+  [$x_1$,$\ldots$,$x_n$]}, porque o resultado $r_i$ de $f\:z\:x_i$ é
+calculado imediatamente, em vez de ser salvo para ser calculado
+posteriormente, no cálculo de $f\: r_1\: x_{i+1}$, para
+$i=1,\ldots,n$, e isso evita que espaço de memória tenha que ser
+alocado a cada $i$ de $1$ até $n$.
+
+No caso de \foldr, a complexidade de espaço da avaliação preguiçosa
+não pode ser melhorada (de $O(n)$ para uma complexidade menor) porque
+a construção dos resultados tem que ser realizada a partir o primeiro
+elemento da lista e terminar com o último elemento da lista (e isso
+envolve um custo $O(n)$), de modo a permitir que os resultados sejam
+calculados do último elemento da lista até o primeiro.
+
+\section{\foldr\ versus \foldl}
+  
+Quando analisamos a eficiência, em termos de tempo e espaço, de
+\foldr\ e \foldl, por exemplo para decidir quando usar uma ou outra
+função, podemos chegar a conclusões interessantes.
+
+Para isso, consideremos \foldr\ primeiro:
+
+{\ttfamily
+\[ \begin{array}{lllllllll}
+      \foldr\ f\: z\:\: ( &\!\!\!\! x_1 & :   & (\ldots & :   & (x_n & :   & \texttt{[\,]}) & \ldots)) = \\ 
+                          &\!\!\!\! x_1 & `f` & (\ldots & `f` & (x_n & `f` & z)  & \ldots)
+\end{array}
+\]}
+
+Note:
+
+\begin{enumerate}
+    \item Se $f\:e$ não for estrita (isto é, se o resultado da
+      avaliação de $e_1$ for suficiente para estabelecer o resultado
+      de {\tt $f\:e_1\:e_2$}, ou seja, se a avaliação de $e_2$ puder
+      não ser necessária para estabelecer o resultado de {\tt $e_1$
+        `$f$` $e_2$}), a complexidade de tempo do cálculo de {\tt
+        (\ina{foldr} $f$ $z$ $x$)} é sub-linear, pois o número de
+      valores de $x$, a partir de $x_1$, necessários para que $f$
+      estabeleça um resultado, será menor ou igual a $n$.
+
+      Por exemplo, \ina{foldr (&&) True [False..]}  é igual a
+      \ina{False} (apesar de \ina{[False..]}  ser infinita), e o tempo
+      necessário para avaliação é constante (esse é o tempo necessário
+      para o cálculo de \ina{False && l}, podendo \ina{l} ser qualquer
+      lista, finita ou infinita).
+
+      O mesmo acontece para a complexidade de espaço.
+
+    \item Se, no entanto, se $f$ e $f\:e$ forem estritas (isto é, se o
+      resultado da avaliação de $e_1$ e de $e_2$ forem necessários
+      para a avaliação de {\tt $e_1$ `$f$` $e_2$}), a complexidade de
+      tempo do cálculo de \ina{foldr} $f$ $z$ $x$ (onde $x$ é igual a
+      \texttt{($x_1$ : ($\ldots$ : ($x_n$ : []) $\ldots$))}) é $O(n)$,
+      onde $n$ é o tamanho de $x$.
+
+      O mesmo acontece para a complexidade de espaço.
+
+    \item No caso de \foldl, a função $f\:z e$ deve ser não-estrita no
+      segundo argumento ($e$): i.e.~o resultado de $f\:z\:e$ deve
+      poder ser obtido sem necessidade de avalizar $z$). Lembre-se:
+
+      \[ \foldl\ f\: z\: ( x_1 : (\ldots : (x_n :  \texttt{[\,]}) \ldots)) = 
+       \: f ( \ldots (f ( f\: z\: x_1 )\: x_2)\: \ldots\: x_n) \]
+
+      Por exemplo, a avaliação de \ina{foldl (&&) True [False..]}  não
+      termina, porque \ina{(&&)} é não-estrita no primeiro argumento
+      (faz casamento de padrão no primeiro argumento) e não no
+      segundo. Ou seja, é preciso o resultado de cada conjunção
+      precisa ser obtido para obtençao da próxima conjunção (o que
+      requer o processamento de uma lista infinita de valores iguais a
+      \False.
+      
+\end{enumerate}
+
+\section{Exercícios}
+
+
+\begin{enumerate}
+
+\item Escreva, usando \foldl\ ou \foldr\, uma função que recebe uma
+  lista de cadeias de caracteres (valores do tipo \String) e retorna
+  uma cadeia de caracteres que contém os 3 primeiros caracteres de
+  cada cadeia.
+
+  Por exemplo, ao receber {\tt ["Abcde", "1Abcde", "12Abcde", "123Abcde"]}
+  deve retornar {\tt \symbol{34}Abc1Ab12A123\symbol{34}}.
+
+\item Escreva, usando \foldr\ ou \foldl, uma função que recebe uma
+  lista de pessoas (valores de tipo \Pessoa, veja definição a seguir)
+  e retorna a soma das idades (valores do campo \idade) de todos os
+  elementos da lista.
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+   data Pessoa = Pessoa {nome::Nome, idade::Idade, id::RG}
+   type Nome   = String
+   type Idade  = Integer
+   type RG     = String
+\end{alg}
+\end{tabular}
+\end{center}
+
+\item Escreva, usando \foldr\ ou \foldl, uma função que recebe uma
+  lista de valores de tipo Item, da definição acima, e retorna o nome
+  da pessoa mais nova da lista.
+
+\item Escreva, usando \foldl\ ou \foldr, uma função que recebe uma
+  lista de cadeias de caracteres (valores do tipo \String) e retorna
+  uma cadeia de caracteres que contém os 3 primeiros caracteres de
+  cada cadeia removidos se não forem letras, ou com as letras em caixa
+  alta se forem letras, e com os demais caracteres depois dos 3
+  primeiros sem alteração.
+
+  Por exemplo, ao receber {\tt ["Abcde", "1Abcde", "12Abcde", "123Abcde"]}
+  deve retornar {\tt \symbol{34}ABCdeABcdeAbcdeAbcde\symbol{34}}.
+
+\item Explique porque \foldr\ $f$ $x$ pode não percorrer toda a lista
+  $x$, ao passo que toda a lista x é sempre percorrida, no caso de
+  foldl.
+
+\item A função \remdups\ remove elementos iguais adjacentes de uma
+  lista, conservando só um dos elementos.
+
+   Por exemplo, {\tt \remdups\ [1,2,2,3,3,3,1,1] = [1,2,3,1]}.
+
+   Defina \remdups\ usando \foldr\ ou \foldl. 
+
+\end{enumerate}
+
+%\end{document}

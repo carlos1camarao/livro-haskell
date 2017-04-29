@@ -1,0 +1,190 @@
+\newcommand{\prog}[1]{
+  \normalfont\ttfamily 
+  \begin{center}\begin{tabular}{l}
+       #1
+  \end{tabular} \end{center}
+  \normalfont}
+
+\newcommand{\proga}[1]{
+ \normalfont\ttfamily 
+  \begin{tabbing}
+        #1
+   \end{tabbing}
+ \normalfont}
+
+\newcommand{\progb}[1]{
+  \normalfont\ttfamily 
+  \begin{center}
+  \mbox{\colorbox{yellow}{\mbox{\begin{tabbing}
+        #1
+  \end{tabbing}}}}
+  \end{center}
+  \normalfont}
+
+\newcommand{\xbox}[1]{\colorbox{yellow}{#1}}
+
+\newcommand{\progbb}[1]{
+  \normalfont\ttfamily 
+  \begin{center}
+  \fbox{\shadowbox{\parbox{\textwidth}{\begin{tabbing}
+        #1
+  \end{tabbing}}}}
+  \end{center}
+  \normalfont}
+
+\newcommand{\progc}[1]{
+  \normalfont\ttfamily 
+  \begin{center}
+  \parbox{\textwidth}{\begin{tabbing}
+        #1
+  \end{tabbing}}
+  \end{center}
+  \normalfont}
+
+\newcommand{\progcc}[1]{
+  \normalfont\ttfamily 
+  \begin{center}
+  \fbox{\begin{tabular}{p{4cm}}
+        #1
+  \end{tabular}}
+  \end{center}
+  \normalfont}
+
+\newcommand{\progaa}[1]{
+  \normalfont\ttfamily 
+  \begin{center}\begin{tabular}{ll}
+       #1
+  \end{tabular} \end{center}
+  \normalfont}
+
+\newcommand{\progaaa}[1]{
+  \normalfont\ttfamily 
+  \begin{center}\begin{tabular}{lll}
+       #1
+  \end{tabular} \end{center}
+  \normalfont}
+
+\newcommand{\main}{{\it main\/}}
+\newcommand{\return}{{\it return}}
+\newcommand{\Monad}{{\it Monad\/}}
+\newcommand{\Control}{{\it Control\/}}
+\newcommand{\Applicative}{{\it Applicative\/}}
+\newcommand{\Show}{{\it Show\/}}
+\newcommand{\Functor}{{\it Functor\/}}
+\newcommand{\IO}{{\it IO\/}}
+\newcommand{\IORef}{{\it IORef\/}}
+\newcommand{\ST}{{\it ST\/}}
+\newcommand{\runST}{{\it runST\/}}
+\newcommand{\STRef}{{\it STRef\/}}
+\newcommand{\newIORef}{{\it newIORef\/}}
+\newcommand{\newSTRef}{{\it newSTRef\/}}
+\newcommand{\readSTRef}{{\it readSTRef\/}}
+\newcommand{\readIORef}{{\it readIORef\/}}
+\newcommand{\writeSTRef}{{\it writeSTRef\/}}
+\newcommand{\writeIORef}{{\it writeIORef\/}}
+\newcommand{\modifyIORef}{{\it modifyIORef\/}}
+\newcommand{\Char}{{\it Char\/}}
+\newcommand{\Int}{{\it Int\/}}
+\newcommand{\Bool}{{\it Bool\/}}
+\newcommand{\Integer}{{\it Integer\/}}
+\newcommand{\String}{{\it String\/}}
+\newcommand{\Handle}{{\it Handle\/}}
+\newcommand{\Num}{{\it Num\/}}
+\newcommand{\Eq}{{\it Eq\/}}
+\newcommand{\Ord}{{\it Ord\/}}
+
+\newcommand{\Maybe}{{\it Maybe\/}}
+\newcommand{\Either}{{\it Either\/}}
+
+
+\newcommand{\True}{{\it True\/}}
+\newcommand{\False}{{\it False\/}}
+\newcommand{\sshow}{{\it show\/}}
+
+\newcommand{\Prelude}{{\it Prelude\/}}
+
+\newcommand{\Tree}{{\it Tree\/}}
+
+\newcommand{\map}{{\it map\/}}
+\newcommand{\mapTree}{{\it mapTree\/}}
+\newcommand{\fmap}{{\it fmap\/}}
+
+\newcommand{\Just}{{\it Just\/}}
+\newcommand{\Nothing}{{\it Nothing\/}}
+
+\newcommand{\unsafePerformIO}{{\it unsafePerformIO\/}}
+\newcommand{\stdin}{{\it stdin\/}}
+\newcommand{\stdout}{{\it stdlout\/}}
+\newcommand{\getChar}{{\it getChar\/}}
+\newcommand{\getLine}{{\it getLine\/}}
+\newcommand{\getContents}{{\it getContents\/}}
+\newcommand{\interact}{{\it interact\/}}
+\newcommand{\putChar}{{\it putChar\/}}
+\newcommand{\putStrLn}{{\it putStrLn\/}}
+\newcommand{\putStr}{{\it putStr\/}}
+\newcommand{\print}{{\it print\/}}
+\newcommand{\open}{{\it open\/}}
+
+\newcommand{\fforall}{{\bf forall}}
+\newcommand{\iif}{{\bf if}}
+\newcommand{\tthen}{{\bf then}}
+\newcommand{\eelse}{{\bf else}}
+\newcommand{\llet}{{\bf let}}
+\newcommand{\iin}{{\bf in}}
+\newcommand{\class}{{\bf class}}
+\newcommand{\instance}{{\bf instance}}
+\newcommand{\ddo}{{\bf do}}
+\newcommand{\data}{{\bf data}}
+\newcommand{\where}{{\bf where}}
+
+\newcommand{\fail}{{\it fail\/}}
+\newcommand{\flip}{{\it flip\/}}
+\newcommand{\id}{{\it id\/}}
+
+\newcommand{\flush}{{\it flush\/}}
+
+\newcommand{\rread}{{\it read\/}}
+\newcommand{\wwrite}{{\it write\/}}
+
+\newcommand{\copyTillEmpty}{{\it copyTillEmpty\/}}
+\newcommand{\while}{{\it while\/}}
+\newcommand{\Folha}{{\it Folha\/}}
+\newcommand{\Nodo}{{\it Nodo\/}}
+\newcommand{\cum}{{\it c1\/}}
+\newcommand{\cdois}{{\it c2\/}}
+
+\newcommand{\feof}{{\it feof\/}}
+
+\newtheorem{Lema}{Lema}
+
+\newcommand{\cf}[3]{
+  \ensuremath{\{ #1 \}\: #2\: \{ #3 \}}
+}
+
+\newcommand{\mdc}{\ensuremath{\textit{mdc\/}}}
+
+\newcommand{\App}{\ensuremath{\textit{App\/}}}
+\newcommand{\foldr}{\ensuremath{\textit{foldr\/}}}
+\newcommand{\foldl}{\ensuremath{\textit{foldl\/}}}
+\newcommand{\fold}{\ensuremath{\textit{fold\/}}}
+\newcommand{\filter}{\ensuremath{\textit{filter\/}}}
+\newcommand{\unif}{\ensuremath{\textit{unif\/}}}
+\newcommand{\remdups}{\ensuremath{\textit{remdups\/}}}
+\newcommand{\Pessoa}{\ensuremath{\textit{Pessoa\/}}}
+\newcommand{\idade}{\ensuremath{\textit{idade\/}}}
+
+\newcommand{\cls}{\ensuremath{\textit{cls\/}}}
+\newcommand{\ccls}{\ensuremath{\textit{cls'\/}}}
+
+\newcommand{\Haskell}{{\it Haskell\/}}
+\newcommand{\ML}{{\it ML\/}}
+
+\newcommand{\APL}{{\tt APL}}
+\newcommand{\VAR}{{\tt VAR}}
+\newcommand{\ABS}{{\tt ABS}}
+\newcommand{\LET}{{\tt LET}}
+\newcommand{\tv}{{\it tv\/}}
+\newcommand{\iid}{{\it id\/}}
+\newcommand{\gen}{{\it gen\/}}
+\newcommand{\llett}{{\tt let\/}}
+\newcommand{\iinn}{{\tt in\/}}

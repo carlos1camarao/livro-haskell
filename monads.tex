@@ -1,0 +1,986 @@
+\chapter{Programação com Ações e Programação Monádica}
+\label{Monadas}
+
+\section{Introdução}
+
+A solução adotada por \Haskell\ para permitir o uso de ações com
+efeito colateral é explicada a seguir. Chamamos de {\em ação\/} uma
+construção da linguagem cuja execução provoca uma ``mudança de
+estado'', como modificar o valor armazenado em uma variável ou
+realizar alguma operação de entrada e saída.
+
+Observação: {\em Ação com efeito colateral\/} é um nome mais ortodoxo,
+uma vez que a palavra {\em ação\/} é usada em Haskell para denotar
+qualquer valor monádico --- isto é, qualquer valor de tipo (monádico)
+$m$ $a$, para qualquer $a$ e qualquer $m$ definido como instância da
+classe \ina{Monad}. No entanto, o uso do termo ``ação'' para um valor
+desse tipo coloca uma qualificação indevida em valores monádicos: se
+não provocam efeito colateral, esses valores são valores como outros
+quaisquer. Portanto, usamos consistentemente ``ação'' com o sentido
+que é usualmente em computação o sentido de ``ação com efeito
+colateral''.
+
+A solução adotada em Haskell é baseada na seguinte ideia básica:
+
+  \begin{quotation}
+     {\bf Um construtor é usado para distinguir uma ação do resultado
+       que ela produz.}
+  \end{quotation}
+
+Em Haskell, valores de tipo {\tt \IO\ $a$}, para um tipo \ina{a}
+qualquer, s\~ao a\c{c}\~oes (com efeito colateral). O tipo que é
+instância de \ina{a} é o tipo do valor retornado pela execução da
+ação.
+
+Valores do tipo \ina{ST s a} também são ações. Neste tipo, a variável
+de tipo \ina{a} pode ser instanciada, como qualquer variável de tipo,
+mas a variável de tipo \ina{s} tem uma característica especial: ela
+não pode ser instanciada em argumentos de \ina{runST} (veja explicação
+a seguir).
+
+Nesses argumentos, a variável \ina{s} existe apenas para identificar
+ou dar um nome a, digamos, um ``fluxo de execução''. O termo ``fluxo
+de execução'' é apenas um nome dado ao argumento de \ina{runST} (uma
+sequência de ações quaisquer), de tipo \ina{ST s a} (para algum
+\ina{a} e, como vamos ver, para um \ina{s} que não pode ser
+instanciado). Tipos (\ina{STRef s a}) de variáveis que podem ser
+modificadas são ``etiquetadas com esse \ina{s}''. Isso é feito para
+que ações que modificam o valor dessas variáveis só possam existir
+nesse argumento (diz-se ``nesse fluxo de execução''). Assim, uma
+variável etiquetada não pode ser usada novamente em outro fluxo de
+execução. No entanto, o resultado obtido na execução desse argumento
+(nesse ``fluxo de execução'') deve poder ser usado em outro fluxo de
+execução.
+
+É possível em Haskell, dessa forma, modificar o valor armazenado em
+uma ``variável'', no sentido de ``variável'' em linguagens e programas
+imperativos. Em Haskell, tais entidades são chamadas de referências e
+devem ter tipo \ina{STRef s a}, para algum \ina{a} e para algum
+\ina{s}. (O tipo \ina{IORef} também pode ser usado para modificação do
+valor armazenado em variáveis, mas não carrega etiqueta, e por isso o
+valor armazenado não pode ``sair'' da mônada \ina{IO}). O tipo
+\ina{STRef s a} indica que a referência (variável, no sentido
+imperativo) é local ao argumento de \ina{runST} (diz-se ``é local a um
+determinado 'fluxo de execução'); essa etiqueta não pode ``sair'' da
+mônada \ina{ST}, ou seja, não pode ser usada em nenhum outro argumento
+a \ina{runST}.  As operações abaixo, que manipulam valores de tipo
+\ina{STRef s a}, têm resultado de tipo \ina{ST s a} (para algum
+\ina{a},\ina{s}):
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+newSTRef :: a -> ST s (STRef s a)
+readSTRef :: STRef s a -> ST s a
+writeSTRef :: STRef s a -> a -> ST s ()
+\end{alg}
+\end{tabular}
+\end{center}
+
+A função \ina{newSTRef} recebe um valor de um tipo $a$ e retorna uma
+ação que, quando executada, retorna uma referência para esse valor.
+
+A função \ina{readSTRef} recebe uma referência a um valor de tipo
+\ina{a} e retorna uma ação que, quando executada, retorna o valor
+armazenado no endereço denotado por essa referência.
+
+A função \ina{writeSTRef} recebe uma referência a um valor de tipo \ina{a}
+e um valor de tipo \ina{a} e retorna uma ação que, quando executada,
+armazena esse valor no endereço denotado pela referência.
+
+Agora você poderá entender precisamente o que temos dito. O único modo
+de usar um valor produzido pela execução de uma ação de tipo \ina{ST s a} 
+(para algum \ina{a}) em um contexto que não envolve o construtor
+\ina{ST}, é por meio do uso da função \ina{runST}, que tem um tipo
+peculiar:
+
+\prog{\ina{(forall s. ST s a) -> a}}
+
+Esse é um tipo diferente dos tipos que vimos até agora. É chamado de
+um tipo polimórfico de {\em grau 2\/} (em inglês, {\em rank 2\/}). Em
+todos os tipos que vimos até agora, o quantificador \ina{forall}
+ocorria externamente, antes do tipo não quantificado. Tais tipos têm
+{\em grau 1\/}. Um tipo de grau 2, como o de \ina{runST}, requer que o
+argumento tenha um tipo no qual o estado (\ina{s}) não é instanciado.
+
+Considere por exemplo a diferença entre 
+  $t_1 = $ \ina{forall a. a->Int} e 
+  $t_2 = $ \ina{(forall a. a)->Int}. 
+O único valor de tipo \ina{forall a. a} é o que denota não-terminação
+($\perp$). No entanto, a variável de tipo \ina{a} pode ser instanciada
+para fornecer várias funções com tipos que são instâncias de $t_2$
+(por exemplo, o tipo de \ina{Int -> Int} é instância de $t_2$).
+
+O tipo de \ina{runST} evita o uso de \ina{runST} em expressões como: 
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+let t = runST (newSTRef True)
+    f = runST (writeSTRef t False)
+in runST (readSTRef t)
+\end{alg}
+\end{tabular}
+\end{center}
+
+Essa expressão não é tipável: note que \ina{newSTRef True} tem tipo
+\ina{ST s (STRef s Bool)}. A expressão \ina{runST (newSTRef Bool)}
+teria então que ter tipo \ina{STRef s Bool}, ou seja, \ina{a} teria
+que ser unificado com \ina{STRef s Bool}. No entanto, isso modificaria
+o tipo \ina{\ST s a}, requerido por \ina{runST}, porque o tipo do
+resultado de \ina{runST (STRef s Bool)} passa a depender de \ina{s} (é
+comum dizer: a variável de tipo $s$ não pode ``escapar'' para o tipo
+do resultado).
+
+A presença da variável \ina{s} em um valor de tipo \ina{STRef s t}
+(para um \ina{t} qualquer) explica porque existem dois tipos distintos
+de referências em Haskell, construídas com \ina{STRef} e com
+\ina{IORef}. O construtor \ina{IORef} não tem tal variável de estado;
+um valor é construído apenas com um valor do tipo que desejado (para
+qualquer \ina{t}, o tipo \ina{IORef t} é um tipo de referência para
+valor de tipo \ina{t}). Em vez de existir uma condição de uso de
+\ina{s} (que requer que \ina{s} não possa ser instanciada e não possa,
+assim, ser usada em tipo de outro argumento para \ina{runST},
+requer-se que não haja, ou pelo menos não seja usada em geral, nenhuma
+função que ``saia da mônada'' \ina{IO} (ou seja, requer-se que não
+haja ou não seja usada em geral nenhuma função como
+\ina{unsafePerformIO}).
+
+O exercício resolvido \ref{Ex:uso-ST} ilustra o uso da mônada
+\ina{ST}.
+
+Para ações de entrada e saída de dados, é usado o construtor \ina{IO};
+por exemplo, a ação de ler um caractere, \ina{getChar}, tem tipo
+\ina{IO Char}. Como já mencionado, o uso do construtor \ina{IO} indica
+que se trata de uma ação, e distingue a ação do resultado obtido pela
+execução da ação, que é um valor de tipo \ina{Char}.
+
+Uma ação de entrada e saída pode ser executada, para se obter o valor
+resultante de sua execução, mas:
+
+  \begin{quotation}
+    {\bf Não é possível definir função que recebe ação de tipo \ina{IO t}, 
+         para um \ina{t} qualquer, e retorna valor de tipo \ina{t}.}
+  \end{quotation}
+
+Não se pode definir, por exemplo, uma função de tipo {\tt
+  \IO\ \Char\ -> \Char}.  Note no entanto que existe uma função,
+disponível na versão de Haskell implementada pelo compilador GHC
+\cite{GHC}, que tem tipo \ina{IO a -> a}: a função
+\ina{unsafePerformIO}.  Mas, como o próprio nome indica, seu uso não é
+em geral seguro, ela só deve ser usada em circunstâncias especiais, em
+que a mudança de estado provocada pela ação de entrada ou saída não
+tem efeito indesejado. O uso de uma função como \ina{unsafePerformIO}
+pode destruir a relevância da distinção entre a ação e o valor
+retornado em sua execução.
+
+As condições sobre o uso de ações em Haskell são essenciais para
+garantir que a linguagem seja uma linguagem funcional pura, com {\em
+  transparência referencial}.
+
+% Essas condições, chamadas de CLFP ({\em condições para linguagem
+%  funcional ser pura\/}) são: i) distinção entre o tipo de uma ação e
+%  o resultado de sua execução --- em Haskell, essa distinção é feita
+%  simplesmente com introdução de um construtor no tipo da ação ---, e
+%  ii) não existência de função que recebe ação e retorna valor que
+%  não envolve ação. ...
+
+Em Haskell, a função \ina{main}, que representa o efeito de executar o
+programa resultante de uma compilação, é uma ação, de tipo \ina{IO()}
+(o parâmetro \ina{()} do construtor \ina{IO} indica que não há valor
+útil retornado como resultado da execução dessa ação). A execução de
+toda ação em um programa Haskell é iniciada a partir da execução da
+ação definida na função \ina{main}.
+
+%O fato de ações serem manipuladas em Haskell por meio do uso de
+%funções monádicas (\return\ e {\tt >>=}) é uma questão secundária,
+%embora importante. A questão principal, mais básica, é a explicitada
+%pela CLFP acima.
+
+%As únicas formas de manipular ações em Haskell são: i) executar uma
+%ação, possivelmente obtendo o resultado dessa execução, e ii) compor
+%uma ação $a_1$ sequencialmente com outra ação $a_2$ (a execução da
+%ação composta consiste em executar $a_1$ e em seguida $a_2$). A
+%execução da ação $a_2$ pode usar o resultado retornado pela execução
+%de $a_1$.
+
+Existem ações básicas de leitura e escrita, como por exemplo
+\ina{getChar} e \ina{putChar} para leitura e escrita de um caractere,
+e \ina{getLine} e \ina{putStr} para leitura e escrita de uma lista de
+caracteres, que serão abordadas na seção \ref{Monada-IO}.
+
+Na seção seguinte é apresentada uma introdução a mônadas em Haskell.
+Em Haskell, ações e valores monádicos em geral são usados como
+argumentos de ``combinadores'' (funções de ordem superior, não locais
+a outras funções, geralmente usadas na construção e combinação de
+valores de um determinado tipo). Funções de ordem superior proveem uma
+maneira de estruturar programas, abordada na seção seguinte.
+
+\section{Mônadas e estruturação de programas}
+\label{Monadas-e-estruturacao-de-programas}
+
+Existem dois {\em combinadores monádicos\/} principais, \ina{return} e
+\ina{>>=}. É comum dizer: \ina{return} faz com que se entre em uma
+mônada, e \ina{>>=} (costuma-se dizer, em inglês, {\em bind\/})
+permite sequenciar ações monádicas. Esses combinadores constituem a
+ferramenta principal usada na manipulação de ações e de valores
+monádicos em geral em Haskell.
+
+%Para mônadas que são ações de entrada e saída, não há como ``sair da
+%mônada'', isto é, obter um valor não monádico --- mais precisamente,
+%não é possível obter valor de algum tipo $t$ a partir de um valor
+%monádico \IO\ $t$ (no entanto, já falamos anteriormente de
+%\unsafePerformIO).
+
+%Para mônadas que não são ações, no entanto, é possível ``sair da
+%mônada'', isto é, simplesmente avaliar a expressão monádica para obter
+%o valor resultante, não monádico.
+
+Em Haskell, uma mônada é uma classe definida como a seguir:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+class Monad m where
+  (>>=) :: m a -> (a -> m b) -> m b
+  (>>) :: m a -> m b -> m b
+  return :: a -> m a
+  fail :: String -> m a
+\end{alg}
+\end{tabular}
+\end{center}
+
+Dado um tipo monádico (instância da classe \ina{Monad}) \ina{m t},
+vamos chamar de \ina{t} o tipo-alvo do tipo monádico. Valor monádico é
+um valor de tipo monádico e expressão monádica é uma expressão de tipo
+monádico.
+
+Em qualquer instância da classe \ina{Monad}, a função \ina{(>>=)}
+compõe sequencialmemte dois valores monádicos, sendo a combinação
+feita de modo que o valor resultante da avaliação (ou execução, no
+caso de ações) do primeiro valor monádico é passado como argumento do
+segundo.
+
+A função \ina{(>>)} é semelhante: compõe sequencialmente dois valores
+monádicos, mas a combinação é feita de modo que o valor resultante da
+avaliação (ou execução, no caso de ações) do primeiro valor monádico é
+descartado (em vez de ser passado para o segundo). A função \ina{(>>)}
+pode ser facilmente definida em termos de \ina{(>>=)}:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+(m >> m') = m >>= \ _ -> m'
+\end{alg}
+\end{tabular}
+\end{center}
+
+A função \ina{return} apenas transforma o argumento em um valor
+monádico, em geral simplesmente etiquetando o argumento com um
+construtor do tipo-alvo do tipo monádico.
+
+A função \ina{fail} receve uma cadeia de caracteres e retorna um valor
+de tipo monádico que indica uma situação de erro. Essa função não é
+parte da definição matemática de mônada, é usada com a notação
+\ddo\ (veja seção \ref{Notacao-do} a seguir), quando ocorre falha em
+casamento de padrões.
+
+\subsection{Exercícios Resolvidos}
+
+\begin{enumerate}
+
+\item Escreva uma função \ina{sequence_} que recebe uma lista de ações
+  e retorne uma ação que consiste em executá-las sequencialmente, uma
+  após a outra, desprezando o resultado obtido com a sua execução. 
+
+{\em Solução\/}: 
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+sequence_ :: Monad m => [m a] -> m ()
+sequence_ = foldr (>>) (return ())
+\end{alg}
+\end{tabular}
+\end{center}
+
+O uso de \ina{_} como sufixo do nome de uma função é usado em geral em
+Haskell para indicar que os resutado da ação é \ina{()} (sendo
+desconsiderados eventuais resultados de argumentos que são ações).
+
+\item Escreva uma função \ina{for_} que recebe um inteiro $n$ e uma
+  ação $m$ e retorna uma ação que consiste em executar $m$ exatamente
+  $n$ vezes, desconsiderando os resultados.
+
+{\em Solução\/}: 
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+for_ :: Monad m => Int -> m a -> m ()
+for_ n = sequence_  . replicate n
+\end{alg}
+\end{tabular}
+\end{center}
+
+\item Escreva uma função \ina{sequence} que recebe uma lista de ações
+  e retorne uma ação que consiste em executá-las sequencialmente, uma
+  após a outra, retornando a lista dos resultados obtidos com a sua
+  execução.
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+sequence :: Monad m => [m a] -> m [a]
+sequence = foldr consa (return [])
+  where consa ma m = do {a <- ma; x <- m; return (a:x)}
+\end{alg}
+\end{tabular}
+\end{center}
+
+\item Escreva função \ina{mapM_} que recebe uma lista de funções, cada
+  uma delas retornando uma ação, e retorne uma ação que consiste em
+  executar as ações resultantes de aplicar á-las sequencialmente, uma
+  após a outra, retornando a lista dos resultados obtidos com a sua
+  execução.
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+sequence :: Monad m => [m a] -> m [a]
+sequence = foldr consa (return [])
+  where consa ma m = do {a <- ma; x <- m; return (a:x)}
+\end{alg}
+\end{tabular}
+\end{center}
+The two new map functions are:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+mapM_ f = sequence_ . map f
+mapM f = sequence . map f
+
+mapM :: (Traversable t, Monad m) => (a -> m b) -> t a -> m (t b)
+\end{alg}
+\end{tabular}
+\end{center}
+
+%Map each element of a structure to a monadic action, evaluate these
+%actions from left to right, and collect the results. For a version
+%that ignores the results see mapM_.
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+mapM_ :: (Foldable t, Monad m) => (a -> m b) -> t a -> m ()
+\end{alg}
+\end{tabular}
+\end{center}
+
+\end{enumerate}
+
+\section{Classes \ina{Foldable}, \ina{Traversable}}
+\label{Foldable-Traversable}
+
+\section{Classes \ina{Functor}, \ina{Applicative}}
+\label{Applicative}
+
+\section{Funtores}
+\label{Funtores}
+
+Funtores em Haskell são construtores de tipos que são instâncias da
+classe \ina{Functor}, definida no \ina{Prelude}, para os quais é
+definida uma função, chamada em Haskell de $\fmap$:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+class Functor f where
+  fmap :: (a -> b) -> f a -> f b
+\end{alg}
+\end{tabular}
+\end{center}
+
+Para cada construtor de tipos \ina{f}, \ina{fmap g} aplica a função
+\ina{g} a todos os elementos da estrutura de dados construída por meio
+de \ina{f}. Note que \ina{f} é um construtor de tipos.
+% (veja seção \ref{Kinds}).
+
+Por exemplo, as funções \ina{map} e \ina{mapTree} com os tipos a
+seguir devem ser definidas de modo a respectivamente aplicar uma
+função fornecida como argumento a cada um dos elementos de uma lista
+ou árvore:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+map :: (a -> b) -> [a] -> [b]
+mapTree :: (a -> b) -> Tree a -> Tree b
+\end{alg}
+\end{tabular}
+\end{center}
+
+A função \ina{map} é uma instância de \ina{fmap} para listas (i.e.~uma
+instância na qual \ina{f} é o construtor de tipos \ina{[]}) e,
+analogamente, \ina{mapTree} é uma instância de \ina{fmap} para árvores
+(i.e.~uma instância na qual \ina{f} é igual ao construtor de tipos
+\ina{Tree}).  O tipo \ina{Tree} deve, é claro, ser visível para que
+\ina{Tree} possa ser usado; a definição pode ser como a seguir:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+data Tree a = Folha a | Nodo (Tree a) (Tree a)
+\end{alg}
+\end{tabular}
+\end{center}
+
+As definições podem ser feitas como a seguir:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+instance Functor [] where
+  fmap = map
+
+instance Functor Tree where
+  fmap f (Folha a) = f a
+  fmap f (Nodo t t') = Nodo (fmap f t) (fmap f t')
+\end{alg}
+\end{tabular}
+\end{center}
+
+\section{Exercícios Resolvidos}
+
+\begin{enumerate}
+
+\item Defina instância de \Functor\ para o construtor de tipo
+  \ina{Maybe}.
+
+{\em Solução\/}: 
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+instance Functor Maybe where
+  fmap _ Nothing  = Nothing
+  fmap f (Just a) = Just (f a)
+\end{alg}
+\end{tabular}
+\end{center}
+
+\end{enumerate}
+
+%mapM :: (Traversable t, Monad m) => (a -> m b) -> t a -> m (t b)
+
+%Map each element of a structure to a monadic action, evaluate these
+%actions from left to right, and collect the results. For a version
+%that ignores the results see mapM_.
+
+\section{Mônadas para estruturamento de código}
+\label{Essencia-da-PF}
+
+A escrever... baseado em: 
+
+\section{Notação \ina{do}}
+\label{Notacao-do}
+
+A notação \ina{do} pode ser usada, em vez de \ina{(>>=)}, para
+combinação de valores monádicos. A notação é definida pelas seguintes
+equações (que funcionam como regras de tradução), onde \ina{m} é uma
+expressão monádica, \ina{cls} é uma sequência não vazia de cláusulas,
+componentes da notação, que termina com uma expressão monádica (i.e.~a
+última cláusula não é da forma \ina{v <- m}), sendo uma cláusula ou
+uma expressão monádica ou uma expressão da forma \ina{v <- m} (onde
+\ina{v} é um nome de variável), e \ccls\ a tradução de \cls:
+
+   {\ttfamily
+   \begin{center}
+   \begin{tabular}{l@{\ $=$\ }l}
+      \ddo\ \{ $m$ \}               & $m$ \\
+      \ddo\ \{ $m$; \cls\ \}        & $m$ >> \ccls\\
+      \ddo\ \{ $v$ <- $m$; \cls\ \} & $m$ >>= $\backslash$ $v$ -> \ccls\\ 
+   \end{tabular}
+   \end{center}}
+
+Note que, por exemplo, as expressões: 
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+   do { c <- getChar } 
+\end{alg}
+\end{tabular}
+\end{center}
+e
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+   do { c <- getChar; c' <- getChar} 
+\end{alg}
+\end{tabular}
+\end{center}
+não são sintaticamente corretas: a última cláusula em uma notação
+\ina{do} tem que ser um valor monádico, i.e.~não pode ser da forma
+\ina{c <- m}.
+
+\section{O que é uma mônada} 
+\label{Regras-monadicas}
+
+Regras monádicas expressam que tipos monádicos devem ter cláusulas que
+podem ser simplificadas como se espera. As simplificações significam
+que \ina{return} é um elemento identidade à direita e à esquerda, e
+que \ina{>>=} ``se assemelha a um combinator associativo'':
+
+   {\ttfamily
+   \begin{center}
+   \begin{tabular}{l@{\ $=$\ }l}
+       $m$ >>= \return         & $m$\\ 
+       \return\ $x$  >>= $f$   & $f\: x$\\
+       ($m$ >>= $f$) >>= $g$   & $m$ >>= ($\backslash$ $x$ -> ($f\: x$ >>= $g$))
+   \end{tabular}
+   \end{center}}
+
+As regras podem ser escritas também, de modo mais simétrico, usando o
+seguinte combinador: 
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+(>=>) :: Monad m => (a -> m b) -> (b -> m c) -> (a -> m c)
+(f >=> g) x = f x >>= g
+\end{alg}
+\end{tabular}
+\end{center}
+
+Esse combinador é semelhante ao operador de composição de funções, mas
+os tipos dos resultados dos argumentos (funcionais) são monádicos, e a
+ordem dos argumentos é inversa à ordem do operador de composição de
+funções (i.e.~o argumento é passado para a primeira função, e o
+resultado é passado para a segunda função, ao contrário do que ocorre
+no caso do operador de composição de funções usual).
+
+Esse combinador é chamado de composição-Kleisli, e está definido na
+biblioteca \ina{Control.Monad}, como:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+  (f >=> g) x = f x >>= g
+\end{alg}
+\end{tabular}
+\end{center}
+
+As regras monádicas expressas por meio do combinador de
+composição-Kleisli indicam que o combinador é associativo com
+identidade \ina{return} --- ou seja, é um monóide (um monóide é um
+conjunto de valores com uma operação binária associativa e um elemento
+identidade). Assim, uma mônada é um monóide se considerarmos o
+operador de composição-Kleisli como o operador de composição e
+\ina{return} como o elemento identidade. No entanto, o uso de
+\ina{>>=} em vez de \ina{>=>} a facilita a programação, e é preferido
+como combinador básico da classe \ina{Monad}.
+
+\subsection{Exercícios Resolvidos}
+\label{Notacao-do-ex-res}
+
+\begin{enumerate}
+
+\item Expresse as regras monádicas usando a notação \ina{do}.
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+do {x <- p; return x} = do {p}
+
+do {x <- return e; f x} = do {f e}
+
+do {y <- do {x <- p; f x}; g y} 
+= do {x <- p; do {y <- f x; g y}}
+= do {x <- p; y <- f x; g y}
+\end{alg}
+\end{tabular}
+\end{center}
+
+\item Suponha que \ina{(>=>)} esteja definido e defina \ina{(>>=)} em
+  termos de \ina{(>=>)}.
+
+{\em Solução\/}: 
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+  (m >>= f) = (id >=> f) m
+\end{alg}
+\end{tabular}
+\end{center}
+Alternativamente: 
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+  (>>=) = flip (id >=>)}.
+\end{alg}
+\end{tabular}
+\end{center}
+
+\end{enumerate}
+
+\subsection{Exercícios}
+\label{Notacao-do-ex}
+
+\begin{enumerate}
+
+\item Defina a versão dual da combinador de composição-Kleisli, de
+  tipo:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+  (<=<):: Monad m => (b->m c) -> (a->m b) -> (a->m c)
+\end{alg}
+\end{tabular}
+\end{center}
+
+Reescreva as regras monádicas usando esse combinador.
+
+\item Mostre que \ina{(f >=> g) . h = (f . h) >=> g}.
+
+\end{enumerate}
+
+\section{Mônada \IO}
+\label{Monada-IO}
+
+Incluímos a seguir as operações pré-definidas (definidas em \Prelude)
+de entrada e saída de dados.
+
+\begin{itemize}
+
+\item {\bf Funções de leitura do dispositivo de entrada padrão}
+
+  \begin{itemize}
+
+    \item \ina{getChar:: IO Char}: Lê um caractere.
+
+    \item \ina{getLine:: IO String}: Lê uma linha.
+
+    \item \ina{getContents:: IO String}: Retorna todo o conteúdo da
+      entrada padrão como uma lista de caracteres, que é lida de fato
+      à medida que essa lista é usada.
+
+    \item \ina{interact:: (String -> String) -> IO()}: Recebe uma
+      função, digamos $f$, como argumento, e passa toda a entrada como
+      uma lista de caracteres para $f$, sendo a cadeia retornada como
+      resultado da aplicação de $f$ escrita no dispositivo de saída
+      padrão (a entrada é lida de fato à medida que os dados são
+      usados por $f$).
+
+  \end{itemize}
+    
+\item {\bf Funções de escrita no dispositivo de saída padrão}
+
+  \begin{itemize}
+    
+    \item \ina{putChar:: Char -> IO()}: Escreve o argumento (um caractere).
+
+    \item \ina{putStr:: String -> IO()}: Escreve o argumento (uma
+      lista de caracteres).
+
+    \item \ina{putStrLn:: String -> IO()}: Escreve o argumento
+      seguido de um caractere de terminação de linha.
+
+    \item \ina{print:: Show a => a -> IO()}: Escreve o resultado de
+      converter o argumento em uma lista de caracteres, usando a
+      função \ina{show}, e adicionar no final um caractere de
+      terminação de linha.
+
+  \end{itemize}
+
+\end{itemize}
+
+Alguns exemplo de programas com entrada e saída de dados
+respectivamente nos dispositivos padrões de entrada e saída, são
+mostrados a seguir.
+
+\subsection{Entrada e saída em Arquivos}
+\label{ES-em-arquivos}
+
+O dispositivo de entrada padrão é denotado em Haskell por \ina{stdin},
+e o dispositivo de saída padrão por \ina{stdout}. Uma operação em um
+dispositivo de entrada e saída padrão é na maioria das vezes caso
+especial de operação mais geral, em que um valor de tipo \ina{Handle},
+com informações sobre o dispositivo (usadas pelo sistema de suporte em
+tempo de execução da linguagem para gerenciar operações de entrada e
+saída de dados), é passado como argumento da operação. Em dispositivos
+que não são os dispositivos de entrada e saída padrão, é necessário,
+antes de usar as operações de entrada ou saída, abrir o arquivo onde
+vai ser realizada a operação. A operação de abrir um arquivo,
+\ina{open}, retorna um valor de tipo \ina{Handle}:
+
+
+\subsection{Exercícios resolvidos}
+\label{ex-IO-resolvidos}
+
+\begin{enumerate}
+
+\item Escreva um programa que usa \ina{getChar} para ler dois
+  caracteres, um depois do outro, e imprimir uma cadeia contendo os
+  dois caracteres lidos, na ordem em que foram lidos, usando
+  \ina{putStr}, usando combinador monádico \ina{(>>=)}. Reescreva
+  usando a notação \ina{do}.
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+  main = getChar >>=
+            (\ c1 -> getChar >>=
+            \ c2 -> getChar -> putStr [c1,c2]))
+\end{alg}
+\end{tabular}
+\end{center}
+
+Usando a notação \ina{do}:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+main = do c1 <- getChar
+          c2 <- getChar
+          putStr [c1,c2]
+\end{alg}
+\end{tabular}
+\end{center}
+
+\item Considere as duas definições abaixo:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+copiaAteLinhaVazia = do lin <- getLine
+                        let copia = do
+                              if (lin == "")
+                                then return ()
+                                else do putStrLn lin
+                                        lin <- getLine
+                                        copia
+                        copia
+\end{alg}
+\end{tabular}
+\end{center}
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+copiaAteLinhaVazia = do 
+  l <- getLine
+  if null l then return ()
+            else do {putStrLn l; copiaAteLinhaVazia}
+\end{alg}
+\end{tabular}
+\end{center}
+
+Uma delas não copia linhas da entrada até que seja lida uma linha
+vazia. Qual e porquê?
+
+{\em Solução\/}: A primeira. 
+
+A primeira função lê uma linha e só termina se esta linha for uma
+linha vazia; caso contrário, qualquer chamada a
+\ina{copiaAteLinhaVazia} não termina: a cláusula \ina{lin <- getLine}
+usada após o teste de \ina{(lin == "")}, na notação \ina{do}, não
+modifica o valor denotado pela variável \ina{lin} usada nesse
+teste. Essa cláusula cria nova variável, de nome \ina{lin}, que tem o
+mesmo nome de variável que já existe (em escopo mais externo; a
+variável mais externa fica invisível devido à criação da variável com
+mesmo nome em escopo mais interno). Podemos reescrever a primeira
+função \ina{copiaAteLinhaVazia} sem usar a notação \ina{do} para
+tornar isso explícito:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+copiaAteLinhaVazia = 
+  getLine >>= \ lin -> let copia = if (lin == "")
+                                     then return ()
+                                     else putStrLn lin >> 
+                                          getLine >>= \ lin -> 
+                                          copia
+                        in copia
+\end{alg}
+\end{tabular}
+\end{center}
+
+\item Escreva uma programa \ina{wc} que se comporte como o programa
+  \ina{wc} existente no Linux.  Ou seja, o programa tem o nome de um
+  arquivo-texto como argumento e imprime o número de linhas, palavras
+  e caracteres existentes no arquivo.
+
+{\em Solução\/}: 
+
+A solução a seguir usa a função \ina{words}, definida em
+\ina{Prelude}, para calcular o número de palavras do texto.
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+wc :: String -> (Int,Int,Int)
+wc s = (length s, words s, filter (=='\n') s)
+
+head':: [String] -> String
+head' [] = error "Nome de arquivo esperado"
+head' s  = head s
+
+main = getArgs >>= print . wc . head' 
+\end{alg}
+\end{tabular}
+\end{center}
+
+A solução a seguir não usa a função \ina{words}; a função \ina{wc'}
+percorre a entrada apenas uma vez calculando o número de caracteres,
+palavras e linhas (e ilustra como calcular o número de palavras por
+meio de um booleano que indica se o caractere corrente é componente de
+uma palavra ou não):
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+import Data.Char (isSpace)
+
+wc :: String -> (Int,Int,Int)
+wc = wc' False
+
+wc' _ []                        = (0,0,0)
+wc' inWord (c:r) 
+  | c_isSpace                   = (numChars+1, numWords', numLins')
+  | otherwise                   = (numChars+1, numWords, numLins)
+  where 
+    c_isSpace                   = isSpace c
+    (numChars,numWords,numLins) = wc' (not c_isSpace) r
+    numWords'
+      | inWord                  = numWords+1 
+      | otherwise               = numWords
+    numLins'
+      | c == '\n'               = numLins+1
+      | otherwise               = numLins
+
+head':: [String] -> String
+head' [] = error "Nome de arquivo esperado"
+head' s  = head s
+
+main = getArgs >>= print . wc . head' 
+\end{alg}
+\end{tabular}
+\end{center}
+
+\item \label{Ex:uso-ST} Escreva uma definição de uma função que receba
+  um inteiro positivo \ina{n} e retorne o \ina{n}-ésimo número de
+  Fibonacci, usando a mônada \ina{ST} para evitar chamadas recursivas
+  de funções. 
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.5\textwidth}{white}
+fib :: Int -> ST s Integer
+fib n = do a <- newSTRef 0
+           b <- newSTRef 1
+           for_ n (do x <- readSTRef a
+                     y <- readSTRef b
+                     writeSTRef a y
+                     writeSTRef b (x+y)
+                 )
+           readSTRef a
+\end{alg}
+\end{tabular}
+\end{center}
+
+%A função \ina{($!)} é usada para forçar a avaliação da soma
+%(\ina{x+y}); ($!) é definida em \ina{Prelude} como:
+%
+%\begin{center}
+%\begin{tabular}{l}
+%\begin{alg}{.5\textwidth}{white}
+%($!) :: (a->b) -> a -> b
+%f $! x = x `seq` f x
+%\end{alg}
+%\end{tabular}
+%\end{center}
+
+%A função \ina{seq} força a avaliação do argumento (\ina{x}) antes de
+%fornecer o resultado da avaliação da aplicação da função (\ina{f}) a
+%este argumento. O uso da função \ina{seq} (e portanto \ina{S!}) deve
+%ser feito somente para tornar o desempenho mais eficiente (quando
+%necessário).
+
+\end{enumerate}
+
+\subsection{Exercícios}
+\label{ex-IO}
+
+\begin{enumerate}
+
+\item ... ... 
+
+\end{enumerate}
+
+\section{Mônada \Maybe}
+\label{Monada-Maybe}
+
+... ...
+
+\section{Referências na mônada \IO}
+
+O módulo \ina{Data.IORef} contém definições para suporte ao uso de
+referências (variáveis no sentido de programação imperativa, i.e.~que
+armazenam um valor que pode ser modificado durante a execução de um
+programa) em Haskell, na mônada \ina{IO}.
+
+As funções definidas no módulo \ina{Data.IORef} são:
+
+\begin{itemize}
+\item \ina{newIORef :: a -> IO (IORef a)}: Recebe um valor e retorna
+  uma referência para esse valor.
+\item \ina{readIORef :: IORef a -> IO a}: Recebe uma referência e
+  retorna o valor apontado pela referência.
+\item \ina{writeIORef :: IORef a -> a -> IO()}: Recebe uma
+  referência e um valor e retorna uma ação que armazena o valor na
+  referência.
+\item \ina{modifyIORef :: IORef a -> (a->a) -> IO()}:
+  Recebe uma referência e uma função $f$ e retorna uma ação que
+  armazena o valor resultante de aplicar $f$ ao valor corrente
+  armazenado na referência. Ou seja, modifica o valor $v$ armazenado
+  na referência pelo valor dado por $f$ $v$.
+\end{itemize}
+
+{\tt \begin{tabbing}
+{\em while\/}:: {\em IO Bool\/} -> {\em IO\/}() -> {\em IO\/}()\\
+{\em while test action\/} = \\
+xx\=\kill
+  \> do \=$b$ <- {\em test}\\
+  \>    \>if $b$ \=then do \={\em action}\\\
+  \>    \>       \>        \>{\em while test action}\\
+  \>    \>       \>else return ()
+\end{tabbing}}
+
+{\tt readRevWrite = getLine >>= apply rev >>= putLine}
+
+\begin{tabular}[t]{ll} M\^onada-Erro & 
+  {\small {\tt \begin{tabular}[t]{l}
+    data Err t = Ok t | Error\\
+    return a = Ok a\\
+    m >>= f = case m of\\
+      \ \ \ (Ok a) -> f a \\
+      \ \ \ Error -> Error
+  \end{tabular} } } 
+\end{tabular}   
+
+Para manipular valores sequencialmente, podemos usar combinadores mais
+simples que os combinadores monádicos, tipicamente \fmap, da classe
+\Functor\ (seção \ref{Funtores}), ou combinadores da classe
+\Applicative\ (seção \ref{Applicative}), abordadas a seguir.
+
+%\section{Mônada \ina{ST}}
+%\label{Monada-ST}
+
+
+

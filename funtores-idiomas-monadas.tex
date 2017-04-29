@@ -1,0 +1,42 @@
+\chapter{Funtores, Funtores Aplicativos e Mônadas}
+
+%Funtores, funtores aplicativos e mônadas são abstrações representadas
+%em Haskell como classes que permitem aplicação de funções em dados que
+%estão encapsulados (ou seja, em dados que são instâncias de $a$ e
+%estão armazenados em $f\: a$, em instância de algum construtor $f$):
+
+
+     class Functor f where
+          fmap:: (a->b) -> f a -> f b
+
+     fmap g fa permite aplicar função (g) em um valor encapsulado fa
+     (obtendo o resultado, depois da aplicação, encapsulado).
+
+  2. class Functor f => Applicative f where
+       pure  :: a -> f a
+       (<*>) :: f (a -> b) -> f a -> f b
+
+      (<*>) fg fa é similar a fmap: a diferença é que a função
+      aplicada (fg) também está encapsulada. O efeito é, novamente,
+      apenas aplicar a função ao valor encapsulado (obtendo o
+      resultado encapsulado).
+
+      pure apenas encapsula um valor (possivelmente, funcional).
+
+   3. class Applicative f => Monad f where
+        return :: a -> f a
+        (>>=)  :: f a -> (a -> f b) -> f b
+
+      return é o mesmo que pure.
+
+      (>>=) fa g recebe valor encapsulado (fa) e passa o valor
+      *desencapsulado* (a) à função g, mas exige que o resultado de g
+      seja um valor encapsulado.
+
+É importante notar que o uso de funções com efeitos colaterais por
+meio dessas funções garante que o resultado final obtido esteja sempre
+encapsulado; o encapsulamento (com o construtor IO, ou com o
+construtor ST) também está encapsulado. É o encapsulamento e a
+garantia de que os valores finais obtidos vão estar sempre
+encapsulados que possibilita a manipulação de funções com efeito
+colateral em uma linguagem pura.

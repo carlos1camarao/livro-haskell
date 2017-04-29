@@ -1,0 +1,552 @@
+%\input{introd}
+
+%Considere a definição e uso de tipos recursivos em linguagens
+%imperativas, como \C\ e \CMM.  ...
+
+%[[ Aqui vem exemplos, talvez começando com o tipo listas, ou árvores
+%binárias, e talvez depois outros... ]]
+
+%\input{tipos-basicos}
+
+%\input{tipos-algebricos}
+
+%\input{verificacao-e-inferencia-de-tipos}
+\chapter{Tipos}
+
+\section{A regra básica}
+\label{Regra-basica}
+
+A regra:
+
+  \[ \frac{f : A \rightarrow B \:\:\: x : A}{f\: x : B} \]
+
+é a regra fundamental usada por um compilador na verificação da
+correção e na inferência dos tipos usados em programas.
+
+Note que existe uma correspondência básica entre tipos e termos
+lógicos (termos da lógica proposicional)
+\cite{Martin-Lof:Constructive-math-and-programming,Sorensen-Urzyczyn:2006:Lectures-Curry-Howard-Iso}.
+  Se consideramos tipos ($A$, $B$, $A \rightarrow B$) como proposições
+  lógicas, e expressões ($f$, $x$, $f \:x$) como provas
+  (demonstrações) dessas proposições, a regra acima é a regra
+  fundamental (chamada de {\em modus ponens\/}) usada em lógica para
+  dedução de novas formas válidas a partir de formas válidas
+  existentes.
+
+A correspondência entre proposições lógicas e tipos, e entre provas
+(demonstrações) e expressões, é conhecida como ``correspondência de
+Curry-Howard'' (também comumente chamada de ``isomorfismo de
+Curry-Howard'')
+\cite{Martin-Lof:Constructive-math-and-programming,Sorensen-Urzyczyn:2006:Lectures-Curry-Howard-Iso}.
+%Foi ....
+
+No caso de linguagens monomórficas, esta é a regra mais fundamental, e
+as demais podem ser consideradas como auxiliares. Por exemplo, para
+deduzir que \ina{(not True)} tem tipo \ina{Bool}, precisamos apenas
+considerar ou saber que \ina{not} tem tipo \ina{(Bool->Bool)} e
+\ina{True} tem tipo \ina{Bool}. Essa consideração ou conhecimento usa
+tipos existentes em um contexto, nesse caso tipos pré-definidos de
+constantes e funções pré-definidas.
+
+% (Falar de duplas/tuplas e currying?) 
+
+\section{Polimorfismo paramétrico}
+
+No caso de linguagens polimórficas, essa regra também deve ser
+aplicada, mas após {\em instanciação\/} do tipo do domínio da função
+para que fique igual ao tipo do argumento. No caso da inferência de
+tipos, essa instanciação é feita por uma função de {\em unificação\/},
+que calcula a substituição mínima que se pode aplicar para que o tipo
+do domínio da função e o tipo do argumento se tornem iguais.
+
+Mais detalhadamente o processo de inferência de tipos usa a seguinte
+regra de aplicação, que vamos chamar de regra (\APL): para que uma
+função (potencialmente polimórfica) {\tt $f$: $t$} possa ser aplicada
+a um argumento {\tt $x$: $t'$}, devemos {\em unificar\/} $t$ com
+$t_A\rightarrow t_B$ (ou seja, $t$ deve ter um tipo funcional) e $t_A$
+com $t'$ (ou seja, o tipo do argumento deve ser unificado com o tipo
+do domínio da função); o tipo resultante é o tipo $t_B$ resultante da
+unificação. Isso vai ser explicado mais precisamente na seção
+seguinte.
+
+O processo de inferência de tipos de um compilador atribui a valores
+que ocorrem em expressões tipos que são conhecidos e, sempre que um
+tipo de um valor ainda não é conhecido, como por exemplo o tipo de um
+parâmetro formal de uma função, uma nova variável de tipo, ainda não
+usada, é (inicialmente) atribuída a esse valor. Depois disso, a
+inferência de tipos consiste em determinar os tipos resultantes das
+unificações especificadas na regra (\APL), que vai ser abordada mais
+detalhadamente na seção seguinte.
+
+\subsection{Unificação e Substitituição}
+
+Dado um conjunto de variáveis $V$, um conjunto de constantes $C$ e um
+conjunto de nomes de funções $F$, o conjunto de termos $T$ pode ser
+definido pelo seguinte tipo algébrico recursivo:
+
+\prog{\data\ T = Con K | Var V | App T T}
+onde supomos que $K$ é um conjunto de constantes e $V$ de variáveis de
+tipo.
+
+Um tipo como $t_1 \cdots\ t_n$ é visto, nessa representação, como
+ $\App\ t_1 (\ldots\ \App\ t_{n-1}\: t_n)$.
+ 
+Uma substituição é uma função finita $S: V_0 \rightarrow T$ de
+variáveis em termos, onde $V_0$ é o conjunto finito de variáveis que
+ocorrem em $T$. A função \id\ é a função identidade, isto é, a função
+definida por $\id\: x = x$.
+
+Dado um conjunto finito de equações $E = \{ t_i=t_i'|i=1,\ldots,n\}$,
+onde $t_i, t_i'$ são termos (valores de $T$), uma substituição
+$\sigma$ é um unificador dos termos de $E$ se
+$\sigma(t_i)=\sigma(t_i)'$, para $i=1,\ldots,n$.
+
+Além disso, uma solução $\sigma$ é mais geral que outra $\sigma'$ se
+existe uma substituição $\sigma_1$ tal que
+$\sigma=\sigma_1\circ\sigma'$. Intuitivamente, um unificador mais
+geral de um conjunto de equações $E$ é o modo mais simples de tornar
+todas as equações do conjunto $E$ iguais.
+
+O seguinte algoritmo retorna \Just\ $m$, onde $m$ é mapeamento que
+representa o unificador mais geral para uma lista qualquer de pares de
+tipo (cada par representando uma equação), se um unificador existir,
+caso contrário retorna \Nothing\ ({\tt (.)} é o operador de composição
+de funções e \ina{ocorreEm} testa ocorrência de variável em tipo):
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.9\textwidth}{white}
+unif [] = id 
+unif ((t, V v): eqs)          = unif ((V v, t): eqs)  
+unif ((V v, t): eqs)                                  
+  | t == V v                  = unif eqs              
+  | v `ocorreEm` t            = Nothing               
+  | otherwise                 = s' . s                
+  where                                               
+    s    = insert v t empty                           
+    eqs' = ap s eqs                                   
+    s'   = unif eqs'                                  
+unif ((K k1, K k2): eqs)                              
+  | k1 == k2                  = unif eqs              
+  | otherwise                 = Nothing               
+unif (App t1 t2, App t1' t2') = s' . s                
+  where s  = unif t1 t1'                              
+        s' = unif (app s t2) (app s t2')              
+unif _                        = Nothing               
+\end{alg}
+\end{tabular}
+\end{center}
+
+As regras usadas na inferência de tipos de um compilador de uma
+linguagem com polimorfismo paramétrico são baseadas em um {\em
+  contexto de tipos\/}, que associam tipos a variáveis (constantes
+podem ser consideradas como variáveis, com tipos a ela associados em
+um contexto global). Contextos de tipos mapeiam variáveis a tipos (é
+comum na literatura o uso de conjuntos de pares representados na forma
+{\em variável : tipo\/}). Vamos usar, como é comum, a meta-variável
+$\Gamma$ para representar contextos de tipos.
+
+Tipos de variáveis podem ser monomórficos, ou {\em simples\/} ou
+polimórficos, ou {\em quantificados\/}. Um tipo simples é formado por
+uma constante ou uma variável, possivelmente aplicada a um ou mais
+tipos simples. Ou seja, é da forma:
+\[ T \texttt{ ::= } K \mid V \mid T\: \bar{T} \]
+
+Usamos $t$ como para denotar valores do tipo $T$, $a$ ou $b$ para
+denotar valores de tipo $V$ e $k$ para denotar valores do tipo $K$,
+podendo essas variáveis ter possivelmente subscritos e aspas
+simples. Usamos $\bar{X}$ para denotar sequências, possivelmente
+vazias, de valores $X$, ou conjuntos de tais valores. Por exemplo,
+$\bar{T}$ representa uma sequência de tipos, e um tipo polimórfico
+$\sigma$, do tipo de conjuntos polimórficos $\Sigma$, é da forma
+$\forall \bar{a}.\:t$; ou seja:
+\[ \Sigma \texttt{ ::= } \forall \bar{V}.\: T \]
+
+A notação $\Gamma, x:t$ representa o contexto $\Gamma'$ tal que
+$\Gamma'(x') = t$ se $x'=x$, senão $\Gamma(x')$ (ou seja, $\Gamma'$ é
+um contexto igual a $\Gamma$ mas $\Gamma'(x) = t$).
+
+A função $\tv$ retorna o conjunto de variaveis livres de um tipo. Em
+particular, $\tv(\forall\bar{a}.\:t) = \tv(t) - \bar{a}$.
+
+A relação $\gen(t,\sigma,\Gamma)$ é a relação de generalização de $t$
+para $\sigma$ em $\Gamma$, definida de forma que $\sigma =
+\forall\bar{a}.\:t$, onde $\bar{a} = \tv(t) - \tv(\Gamma)$.
+
+Um tipo $S(\sigma)$, ou simplesmente $S\sigma$, onde $S$a é uma
+substituição tal que $S(a) = a$ se $a \not= a_i$, $S(a_i) = b_iq$,
+para $i$ de 1 a $n$, representa o tipo resultante de substituir cada
+$a_i$ por $b_i$, para $i$ de 1 a $n$. O tipo $S\sigma$ pode ser
+denotado também por
+ $\texttt{\symbol{91}}\bar{a}\texttt{ := }\bar{b}\texttt{\symbol{93}}\sigma$.
+
+O algoritmo de inferência de tipos de uma linguagem como o núcleo da
+linguagem \ML\ pode ser descrito usando as regras mostradas na Figura
+\ref{Inf-tipos}, onde $\Gamma \vdash e: (t,S)$ significa que $e$ tem
+tipo $t$ no contexto de tipos $\Gamma$. A substituição $S$ é usada
+para unificação de tipos de expressões usadas em $e$. Esse algoritmo
+foi definido por Robin Milner e Luís Damas \cite{DamasMilner82}, sendo
+chamado de algoritmo $W$.
+
+A regra (\VAR) retorna o tipo da variável no contexto de tipos
+(supõe-se que um programa é um termo fechado, isto é, sem variáveis
+{\em livres\/}, no sentido de $\lambda$-cálculo).
+
+A regra (\APL) é a regra básica (ver seção \ref{Regra-basica}) da
+inferência de tipos: usa unificação para tornar o tipo domínio da
+função igual ao tipo do argumento.
+
+A regra (\ABS) cria uma nova variável ($a$, na Figura \ref{Inf-tipos})
+para o tipo do parâmetro, usando a substituição ($S$) obtida na
+inferência do tipo do corpo da $\lambda$-abstração para especialização
+do tipo do parâmetro. O tipo da $\lambda$-abstração é o tipo funcional
+$S(a)\rightarrow t$, sendo $t$ o tipo inferido para a expressão $e$,
+corpo da $\lambda$-abstração.
+
+A regra (\LET) generaliza o tipo inferido para $e$ para obter o tipo
+de $e'$, que é retornado como o tipo da expressão {\tt \llett\ $x$ =
+  $e$ \iinn\ $e'$}. Note que a regra (\LET) é que permite a introdução
+de tipos polimórficos; o uso de variáveis definidas na regra (\LET)
+pode ser usada em contextos que requerem tipos distintos, como por
+exemplo em:
+\[ \texttt{\llett\ $f$ = $\lambda x.\:x$ \iinn\ ($f\: \True, f\:1$)} \]
+onde $\True$ e $1$ têm tipos distintos (\Bool\ e \Integer), e o tipo
+de $f$ pode ser instanciado (no algoritmo $W$, via unificação) para
+\Bool $\rightarrow$ \Bool\ e para \Integer $\rightarrow$ \Integer.
+
+\begin{figure}
+  \[ \begin{array}{lr}
+        \frac{\Gamma(x) = \forall\bar{a}.\:t  \:\:\:\: {\bar{b} \textrm{variáveis novas}}}
+            {\Gamma \vdash x:\: (\symbol{91}\bar{a} {\texttt{:=}}\,\bar{b}\symbol{93}\,t\,,\:\iid)}
+            & \texttt{(\VAR)} \\[.2cm]
+        \frac{\Gamma \vdash f: \:(t,S)  \:\:\:\: S(\Gamma) \vdash e:\: (t'\,,\:S') \:\:\:\: a \textrm{variável nova}}
+             {\Gamma \vdash f \: e: \:(S(a)\,,\:S_u \circ S' \circ S )}
+            & S_u = \unif(\symbol{91}(t,\: t' \rightarrow a)\symbol{93}) \:\:\:\: {\tt (\APL)} \\[.2cm]
+        \frac{\Gamma,x:a \vdash e:\:(t\,,\:S) \:\:\:\: a \textrm{variável nova}}
+             {\Gamma \vdash \lambda x \texttt{->}\:e:\: (S(a)\texttt{->}\:t\,,\:S)} 
+            & \texttt{(\ABS)} \\[.2cm]
+        \frac{\Gamma \vdash e:\: (t\,,\:S) \:\:\: \gen(t,\sigma,S(\Gamma)) \:\:\: S(\Gamma),x:\sigma \vdash e':\: (t',S')}
+             {\Gamma \vdash \llett\ x {\texttt{ = }} e\: \iinn\ e':\: (t'\,,\:S' \circ S)}
+            & \texttt{(\LET)}
+     \end{array}
+  \]
+\caption{Algoritmo W}
+\label{Inf-tipos}
+\end{figure}
+
+A regra (\LET) (e a linguagem núcleo de \ML\ do algortimo $W$ definido
+na Figura \ref{Inf-tipos}) não considera recursão: $x$ não pode
+ocorrer em $e$ na expressão {\tt \llett\ $x$ = $e$ \iinn\ $e'$}.
+
+%Para permitir definições recursivas, há duas possibilidades: a
+%primeira é permitir a chamada {\em recursão polimórfica\/},
+%inicialmente estudada por Mycroft \cite{Mycroft84}, mas isso leva a
+%indecidibilidade da inferência de tipos (isso foi provado por Kfoury
+%et al. \cite{KTU94}). O leitor interessado pode consultar também
+%\cite{LuCarWFLP2001}.
+
+No entanto, o uso do algoritmo definido na Figura \ref{Inf-tipos} não
+é necessário para determinar o tipo de funções, na prática, uma vez
+que ele é baseado fundamentalmente no uso do tipo de variáveis que
+estão no contexto de tipos, pela introdução de novas variáveis de tipo
+para o tipo de variáveis introduzidas em $\lambda$-abstrações, e pelo
+uso de unificação em aplicações de funções a seus argumentos. Não é
+necessário seguir todos os passos do algoritmo. Podemos usar a
+seguinte técnica, que vamos chamar de
+técnica-informal-de-inferência-de-tipos. Considere, por exemplo, a
+tarefa de inferir o tipo da expressão:
+
+\[ \lambda f.\:\lambda x.\:f\:(f\:x) \]\
+
+Sabemos que o tipo dessa expressão é da forma:
+\[ t_f \rightarrow t_x \rightarrow t_r \]
+onde: \begin{tabular}[t]{l}
+        $t_f$ (é uma variável que) representa o tipo de $f$,  \\
+        $t_x$ (é (uma variável que) representa o tipo de $x$ e \\
+        $t_r$ (é uma variável que representa) o tipo do resultado, $f\:(f\: x)$.
+\end{tabular}
+\newline
+Introduzimos agora as informações que pudermos obter com os usos das variáveis 
+$f$ e $x$ na expressão $f\:(f\:x)$, devido a unificação, que são:
+\begin{itemize}
+\item $f$ tem tipo funcional (pois $x$ é aplicado a $f$), ou seja, é da forma $t_1\rightarrow t_2$;
+\item o tipo de $x$ é o mesmo do domínio de $f$, ou seja, $t_1 = t_x$;
+\item o tipo do resultado de $f$ ($t_2$) é o mesmo do argumento de $f$ (pois o resultado, $f\:x$ é aplicado a $f$).
+\end{itemize}.
+
+Note: cada ocorrência de parâmetro de função --- i.e.~cada variável em
+uma $\lambda$-abstração --- tem um tipo monomórfico (essa é uma
+característica fundamental do sistema de tipos de \ML\ e \Haskell).
+
+Usando essas informações, obtemos que o tipo de:
+\[ \lambda f.\:\lambda x.\:f\:(f\:x) \]
+é igual a (chamando $t_x$ simplesmente de $a$):
+\[ (a \rightarrow a) \rightarrow a \rightarrow a \]
+
+Essa técnica pode ser estendida para os casos de definições
+recursivas, que envolvam mais de uma equação, (lembrando que
+parâmetros têm tipos monomórficos e) considerando que:
+
+\begin{itemize}
+  \item uma equação {\tt $f\: p_1\: \ldots\: p_n$ = $e$} pode ser vista
+    como tendo o tipo de uma $\lambda$-abstração: {\tt $\lambda p_1.\:
+      \ldots\: \lambda p_n.\: e$}, sendo esse o tipo de $f$.
+  \item toda definição:
+    {\texttt{ \[\begin{array}[t]{ll}
+                  f\: p_{11}\: \ldots\: p_{1n}\: & = \:e_1\\
+                  \ldots & \\
+                  f\: p_{m1}\: \ldots\: p_{mn}\: & = \:e_m
+        \end{array}\]}}
+      deve ser tal que os tipos de cada resultado $e_i$, assim como os
+      tipos de cada parâmetro $p_{ij}$, para cada $i,j$
+      ($i=1,\ldots,m$ e $j=1,\ldots,n$) são iguais: para isso os tipos
+      de cada equação devem ser unificados (se não for possível
+      unificar os tipos de cada equação, a definição não é bem
+      tipada).
+      
+\end{itemize}
+
+Por exemplo, considere a definição de \map:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.9\textwidth}{white}
+  map f []    = [] 
+  map f (a:x) = f a : map f x
+\end{alg}
+\end{tabular}
+\end{center}
+
+Vamos calcular o tipo de \map\ inicialmente na primeira
+equação. Poderíamos começar com $t_f \rightarrow t_l \rightarrow t_r$, sendo
+$t_f$, onde:
+\begin{quotation}
+  \begin{tabular}{l}
+        $t_f$ é (uma variável que representa) o tipo de $f$,  \\
+        $t_x$ é (uma variável que representa) o tipo de {\tt []} e \\
+        $t_r$ é (uma variável que representa) o tipo do resultado, também {\tt []}.
+  \end{tabular}
+ \end{quotation}
+No entanto, como sabemos, pelo tipo de {\tt []} no contexto de tipos,
+que {\tt []} tem tipo {\tt [$a$]}, sendo $a$ uma variável nova,
+podemos considerar que o tipo de \map\ na primeira equação é:
+
+{\ttfamily
+  \[ t_f \rightarrow [a] \rightarrow [b] \]
+}
+
+Note que as ocorrências de {\tt []} têm tipos distintos, com variáveis
+de tipo $a$ e $b$ novas, pois o tipo de {\tt []}, no contexto de
+tipos, é polimórfico.
+
+Na segunda equação, podemos atribuir a \ina{map} inicialmente o tipo:
+$t_f \rightarrow t_l \rightarrow t_r$, sendo:
+     $t_f$ variável que representa o tipo de $f$,  
+     $t_l$ variável que representa o tipo de \ina{a:x} e
+     $t_r$ variável que representa o tipo de \ina{f a:map f x}.
+Temos:
+
+\begin{itemize}
+  \item sendo $t_l$ igual a {\tt [$a$]} (de acordo com o tipo de {\tt
+    []} usado para esse parâmetro na primeira equação), o tipo de
+    \ina{a} é igual a $a$ e o tipo de \ina{x} é igual a {\tt [$a$]}
+    (pois o tipo de \ina{(:)} no contexto de tipos é igual a
+    $a'\rightarrow \texttt{[$a'$]} \rightarrow \texttt{[$a'$]}$, para
+    alguma variável nova $a'$, mas $a'$ deve ser igual a $a$, pois os
+    tipos dos parâmetros nas duas equações devem ser iguais.
+
+  \item $t_f$ deve ser um tipo funcional, pois \ina{f} é aplicado a
+    \ina{a}, e o tipo do resultado de \ina{f} deve ser igual a $b$,
+    igual ao tipo do elemento da lista {\tt [$b$]}: {\tt [$b$]} é o
+    resultado de \ina{map f []} na primeira e na segunda equações, e
+    igual ao tipo do resultado de \ina{map f x}.
+
+\end{itemize}
+
+Portanto, o tipo de \ina{map}, definido pelas duas equações acima, é:
+
+\[ (a \rightarrow b) \rightarrow \texttt{[$a$]} \rightarrow \texttt{[$b$]}
+\]
+
+\subsection{Sobrecarga e Tipos restritos}
+\label{Tipos-restritos}
+
+Um valor sobrecarregado tem um tipo polimórfico restrito (ou
+constrito) --- por exemplo, {\tt (==)} tem tipo
+  \ina{Eq a => a -> a -> Bool}.
+
+{\em Quando a sobrecarga é resolvida\/} (e apenas neste caso), devido
+a instanciação do tipo polimórfico (via unificação), é preciso
+verificar se há instâncias no contexto que satisfazem ao tipo do valor
+sobrecarregado que foi instanciado:
+
+\begin{itemize}
+  \item se há apenas uma instância, a restrição é removida do tipo;
+  \item se não ha nennhuma instância, ocorre um erro de tipo:
+    insatisfazibilidade.
+  \item se há duas ou mais instâncias, ocorre um erro de tipo: ambiguidade.
+\end{itemize}
+
+Por exemplo, a expressão {\tt 1 + '1'} usualmente gera um erro de
+tipo, porque usualmente não há instância de \Num\ para o tipo \Char.
+
+Em Haskell, infelizmente, não há, ainda, definição de quando uma
+sobrecarga é resolvida, e esta condição (quando uma sobrecarga é
+resolvida) é confundida com ambiguidade: em Haskell um tipo é ambíguo
+se existe uma variável de tipo que ocorre em uma restrição e não
+ocorre no tipo simples. Por exemplo, o tipo da expressão
+\ina{(show . read)},
+que é:
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.9\textwidth}{white}
+  (Read a, Show a) => String -> String
+\end{alg}
+\end{tabular}
+\end{center}
+é considerado ambíguo, pois a variável de tipo \ina{a} ocorre em uma
+restrição e não ocorre no tipo (simples) \ina{String -> String}.
+
+Em Haskell, não há, assim, diferença entre insatisfazibilidade e
+ambiguidade, nem entre sobrecarga resolvida e ambiguidade.
+
+O teste de satisfazibilidade, que deve verificar se existe ou não uma
+única instância que satisfaz a uma restrição, é em geral um problema
+indecidível \cite{Smith91,VolpanoSmith91}. Existem várias opções de
+compilação no GHC para restringir tipos polmórficos restritos
+\cite{GHC}. No entanto, essas opcões poderiam ser evitadas por um
+mecanismo baseado em uma medida do tamanho dos tipos que formam as
+restrições, medida essa calculada durante o processo de testar
+satisfazibilidade 
+\cite{Ambig-and-cxt-dep-overloading-2013,Ambig-and-constrained-poly-2016}.
+
+Quando há mais de uma equação em uma definição, as restrições de cada
+equação devem ser consideradas (isto é, devem ser unidas) para gerar a
+restrição final resultante da unificação de cada uma das
+equações. Veja por exemplo o exercício resolvido \ref{Ex:merge}.
+
+\section{Exercícios Resolvidos}
+
+\begin{enumerate}
+
+% \item Determine o tipo de $\lambda f.\:\lambda x.\:f\:(f\: x)$,
+%   usando a técnica-informal-de-inferência-de-tipos.
+%
+%   {\em Solução\/}: Podemos ver que $f$ é uma função, digamos $a
+%   \rightarrow b$ (pois $f$ é aplicada a $x$ e a $(f\:x)$), onde $a$ e
+%   $b$ são variáveis novas. Podemos ver que $a$ é igual ao tipo de
+%   $x$, e que o tipo de retorno de $f$ (igual a $b$) também é igual a
+%   $a$, pois $f\:x$ (retorno de $f$) é também argumento de $f$.
+%   Portanto, o tipo de $\lambda f.\:\lambda x.\:f\:(f\: x)$ é:
+%
+%     \[ (a \rightarrow a) \rightarrow a \rightarrow a \]
+
+ \item \label{Ex:merge} Considere a definição de \ina{merge} a seguir:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.9\textwidth}{white}
+merge :: ([a], [a]) -> [a]
+merge ([], y) = y                   -- (1)
+merge (x, []) = x                   -- (2) 
+merge (a:x, b:y)                    -- (3) 
+  | a <= b    = a:merge (x, b:y)    -- (4)
+  | otherwise = b:merge (a:x, y)    -- (5)
+\end{alg}
+\end{tabular}
+\end{center}
+
+Use a técnica-informal-de-inferência-de-tipos para determinar o tipo
+de \ina{merge}.
+
+{\it Solução\/}: O tipo de \ina{merge} é, inicialmente, igual a $t_p
+\rightarrow t_r$, onde $t_p$ é o tipo do argumento e $t_r$ o tipo do
+resultado.  Vamos determinar o tipo de cada equação, depois vamos
+considerar que o tipo de cada equação é o mesmo, e para isso vamos
+usar unificação, conservando (isto é, unindo) as restrições existentes
+nos tipos de cada equação.
+
+O tipo de \ina{merge} na linha \ina{1} (primeira equação) é
+  {\tt ([$a$],$t_y$) -> $t_y$}.
+
+O tipo de \ina{merge} na linha \ina{2} (segunda equação) é {\tt
+  ($t_x$,[$b$]) -> $t_x$}.
+
+Na linha \ina{3} (são duas equações neste caso, uma para cada guarda),
+o tipo de \ina{merge} é {\tt \Ord\ $a$ => ([$a$],[$a$]) -> [$a$]};
+  note que:
+  \begin{itemize}
+    \item a restrição {\tt \Ord\ $a$} é inserida devido ao uso do
+      operador sobrecarregado {\tt <=} (na linha \ina{4});
+    \item inicialmente o tipo de \ina{merge} na linha \ina{3} seria
+      {\tt ([$a$],[$b$]) -> $t_r$}, mas, tanto devido à comparação
+      \ina{a <= b} --- o tipo de {\tt <=} é
+      \ina{Ord a => a -> a -> Bool},
+      portanto o tipo de \ina{a} e de \ina{b} em \ina{a <= b} têm que
+      ser iguais --- quanto devido ao fato de que os tipos de $t_r$
+      nas linhas \ina{4} e \ina{5} têm que ser iguais ($t_r$ é igual
+      {\tt [$a$]} na linha \ina{4} e igual a {\tt [$b$]} na linha
+      \ina{5}, o tipo de \ina{merge} na última ``equação'' é
+          {\tt \Ord\ $a$ => ([$a$],[$a$]) -> [$a$])}.
+  \end{itemize}
+
+  Unificando os tipos das equações, obtemos o tipo de \ina{merge}:
+
+    \[ \texttt{\Ord\ $a$ => ([$a$],[$a$]) -> [$a$]} \]
+
+\end{enumerate}
+
+\section{Exercícios}
+
+\begin{enumerate}
+
+\item Determine o tipo de $\lambda x.\:\lambda y.\:\lambda z.\:x\: z
+  (y\: z)$, usando a técnica-informal-de-inferência-de-tipos.
+
+\item Use a técnica-informal-de-inferência-de-tipos para determinar o
+  tipo da função \ina{either} definida abaixo:
+
+  \begin{enumerate}
+
+  \item Sendo o tipo \Either\ é definido como:
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.9\textwidth}{white}
+  data Either a b = Left a | Right b
+\end{alg}
+\end{tabular}
+\end{center}  
+defina como é inferido o tipo de \ina{either}, usando a
+técnica-informal-de-inferência-de-tipos, definido como:
+\begin{center}
+\begin{tabular}{l}
+\begin{alg}{.9\textwidth}{white}
+    either f g (Left x)  =  f x
+    either f g (Right y) =  g y
+\end{alg}
+\end{tabular}
+\end{center}  
+
+  \end{enumerate}
+  
+\item Defina expressão ou função com tipo:
+
+  \begin{enumerate}
+
+  \item {\tt (\Ord\ a, \Show\ a) -> \String}
+
+  \item {\tt ($a$ -> $b$ -> $c$) -> $b$ -> $a$ -> $c$}
+
+  \item {\tt ($a$ -> $b$, $a$ -> $c$) -> $a$ -> ($b$,$c$)}
+
+  \item {\tt ($a$ -> $b$, $b$ -> $d$) -> ($a$,$b$) -> ($c$,$d$)}
+
+  \item {\tt ($b$ -> $c$) -> ($a$->$b$) -> $a$ -> $c$}
+  
+  \item {\tt [($a$, $b$)] -> ([$a$], [$b$])}
+
+  \item {\tt ($a$ -> $b$ -> $a$) -> $a$ -> [$b$] -> [$a$]}
+
+  \end{enumerate}
+    
+\end{enumerate}

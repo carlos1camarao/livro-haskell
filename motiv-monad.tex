@@ -1,0 +1,746 @@
+O problema de usar ações com efeitos colaterais em uma linguagem
+funcional pura pode ser resolvido, como vimos, com a introdução de um
+construtor de tipos para tipos de ações, de modo a distinguir a ação
+do resultado retornado por sua execução, e com devidas restrições ao
+uso de funções que recebem uma ação e retornam valores que não são
+ações.
+
+O uso de mônadas em Haskell permite e facilita estabelecer tais
+restrições, mas não é necessário para isso. 
+
+A motivação principal para o uso de mônadas em programação funcional
+está relacionada ao estruturamento de programas. Especificamente, ao
+fato de que em geral é mais fácil modificar um programa monádico para
+adaptá-lo a mudanças na sua especificação, principalmente com relação
+a introdução de novos requisitos na especificação, do que um programa
+não monádico.
+
+Nota: em geral é, para programadores, mais trabalhoso (e requer mais
+treinamento) desenvolver um programa monádico do que um programa não
+monádico que apresenta o mesmo comportamento. No entanto, depois de
+pronto, em geral um programa monádico pode ser mais facilmente
+modificado, particularmente no que se refere a introdução de
+requisitos adicionais na sua especificação. Na prática, é bastante
+comum a modificação e evolução de programas.
+
+Vamos usar o mesmo exemplo empregado em artigos que introduziram o uso
+de mônadas na programação funcional, apresentados por Philip
+Wadler \cite{Monads-for-fp-Wadler-95,Wadler:1992:Essence-of-FP}. O
+exemplo considera um avaliador de expressões: uma função \inh{eval}
+que recebe uma expressão $e$ e retorna o resultado obtido pela
+avaliação de $e$. Vamos considerar o tipo de expressões, \inh{Exp},
+como sendo o definido a seguir:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{hask}{}{green}
+type Name   =  String 
+data Exp    =  Con Integer
+            |  Var  Name
+            |  Add  Exp  Exp
+            |  Abs  Name Exp
+            |  App  Exp  Exp
+            deriving (Eq, Show)
+\end{hask}
+\end{tabular}
+\end{center}
+
+O tipo de valores (resultados de avaliações de expressões),
+\inh{Value}, e o tipo \inh{Env}, um mapeamento de variáveis em
+valores, usados pelo avaliador de expressões, é definido como:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{hask}{}{green}
+data Value  =  IntVal Integer 
+            |  FunVal Name Exp Env 
+            deriving (Eq)
+type Env    =  M.Map Name Value    -- from names to values
+
+instance Show Value where
+  show (FunVal _ _ _) =  "<função>"
+  show (IntVal v    ) =  show v
+\end{hask}
+\end{tabular}
+\end{center}
+
+Um avaliador de expressões que são valores de tipo \inh{Exp} poderia
+ser escrito como a seguir:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{hask}{}{green}
+import                 Data.Maybe    (fromJust)
+import qualified       Data.Map as M (empty,insert,lookup,Map)
+
+eval0 :: Exp -> Env -> Value
+eval0 (Con i)     env = IntVal i
+eval0 (Var x)     env = fromJust (M.lookup x env)
+eval0 (Add e1 e2) env = let IntVal i1  = eval0 e1 env
+                            IntVal i2  = eval0 e2 env 
+                         in IntVal (i1 + i2)
+eval0 (Abs x e)   env = FunVal x e env 
+eval0 (App e1 e2) env = let f   = eval0 e1 env
+                            arg = eval0 e2 env 
+                         in case f of
+                              FunVal x e env' -> eval0 e (M.insert x arg env')
+\end{hask}
+\end{tabular}
+\end{center}
+
+No exemplo seguinte e outros mais adiante, vamos usar a seguinte declaração
+(para a expressão\inh{10 + (\ x -> x + 1) 4)}): 
+
+\begin{center}
+\begin{tabular}{l}
+\begin{hask}{}{green}
+exp1 = Add (Con 10) (App (Abs "x" (Add (Var "x") (Con 1))) (Con 4))
+\end{hask}
+\end{tabular}
+\end{center}
+ retorna 17
+
+Temos: \inh{eval0 exp1} retorna \inh{IntVal 15}.
+
+O código de \inh{eval0} se comporta corretamente no caso de receber
+expressões bem-tipadas (em um sistema de tipos com regras de tipos
+usuais) como entrada, mas não se comporta bem quando recebe expressões
+com erros de tipos, tais como: uso de variáveis que não ocorrem em
+lambda-abstrações, adição de valores funcionais e aplicação de valores
+não funcionais. 
+
+Um avaliador (interpretador) de expressões usado na prática não
+deveria se preocupar com erros de tipo. Esses erros deveriam ser
+considerados em uma fase anterior, de verificação de correção de tais
+erros. Mas, estamos considerando esse caso apenas como um exemplo
+(como fizeram outros autores que trataram do assunto anteriormente).
+
+Por exemplo, ocorre um erro de casamento de padrão (devido a aplicação
+de (\inh{fromJust} a \inh{Nothing}) na execução de:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{hask}{}{green}
+main = putStrLn . show . eval0 M.empty $ (Var "x")
+\end{hask}
+\end{tabular}
+\end{center}
+
+A definição de \inh{eval0} poderia ser modificada no sentido de tornar
+a função denotada total. Para isso, a função pode retornar, em vez de
+um valor de tipo \inh{Value}, um valor que permita indicar um possível
+erro de tipo. Podemos fazer isso usando o tipo \inh{Either} como a
+seguir:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{hask}{}{green}
+import                 Data.Maybe    (fromJust)
+import                 Data.Either   (Either)
+import qualified       Data.Map as M (empty,insert,lookup,Map)
+
+type Error = String
+
+eval1 :: Exp -> Env -> Either Error Value
+eval1 (Con i)     env = Right $ IntVal i
+eval1 (Var x)     env = case M.lookup x env of
+                          Nothing  -> Left (x ++ " não ocorre em lambda-abstração")
+                          Just val -> Right val
+eval1 (Add e1 e2) env = let v1  = eval0 env e1
+                            v2  = eval0 env e2
+                         in case (v1,v2) of 
+                              (IntVal i1, IntVal i2) -> Right $ IntVal (i1 + i2)
+                              (IntVal i1, _          -> Left ("Esperada: construção de argumento de Add " ++ show v2 ++ " com IntVal")
+                              _                      -> Left ("Esperada: construção de argumento de Add " ++ show v1 ++ " com IntVal")
+eval1 (Abs x e)   env = Right $ FunVal env x e
+eval1 (App e1 e2) env = let f   = eval0 e1 env 
+                            arg = eval0 e2 env 
+                         in case f of
+                              FunVal env' x e -> eval0 (M.insert x arg env') e
+                              _               -> Left ("Esperada: construção de " show f ++ " com Funval")
+\end{hask}
+\end{tabular}
+\end{center}
+
+A função \inh{eval1} acima funciona para casos como:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{hask}{}{green}
+main = putStrLn . show . eval1 (Var "x") $ M.empty 
+\end{hask}
+\end{tabular}
+\end{center}
+
+Mas, para tratar todos os casos de erros (como \inh{Add} aplicado a
+uma função), o código se torna inadequado por não separar os casos que
+tratam dos casos que não tratm erros.
+
+Esta é a motivação principal para o uso de mônadas: tornar o programa
+mais fácil de ser modificado e estendido, e separar aspectos
+específicos do código principal.
+% (chamar isso de "essência da programação funcional" é ``forte'').
+
+Consideremos o uso de uma mônada definida com o
+construtor \inh{EvalTo} como a seguir:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{hask}{}{green}
+type Error    = String
+type EvalTo a = Either Error a
+
+runEval ::  Show a => EvalTo a -> String
+runEval (Left s)  =  s
+runEval (Right v) =  show v
+
+eval2                :: Exp -> Env -> EvalTo Value
+eval2 (Con i)     env = return $ IntVal i
+eval2 (Var x)     env = case M.lookup x env of
+                          Nothing -> fail ("variável não ocorre em lambda-abstração: " ++ x)
+                          Just v  -> return v
+eval2 (Add e1 e2) env = do IntVal i1  <- eval2 e1 env 
+                           IntVal i2  <- eval2 e2 env
+                           return $ IntVal (i1 + i2)
+eval2 (Abs n  e)  env = return $ FunVal n e env
+eval2 (App e1 e2) env = do f   <- eval2 e1 env 
+                           arg <- eval2 e2 env 
+                           case f of
+                             FunVal x e env' -> eval2 e (M.insert x arg env')
+\end{hask}
+\end{tabular}
+\end{center}
+
+A execução de:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{hask}{}{green}
+main = do putStrLn . runEval . eval2 exp1 $ M.empty
+          putStrLn . show . eval2 (Var "x") $ M.empty 
+\end{hask}
+\end{tabular}
+\end{center}
+continua a sinalizar o erro desse exemplo como anteriormente. 
+
+No entanto, a mensagem de erro para erros de tipo continua a ser
+inadequada; por exemplo, considere o resultado de executar a
+ação \inh{erroDeTipo} abaixo:
+
+\begin{center}
+\begin{tabular}{l}
+\begin{hask}{}{green}
+exp2 = Add (Con 12) (Abs "x" (Var "x"))
+
+erroDeTipo = putStrLn . runEval . eval2 exp2 $ M.empty 
+\end{hask}
+\end{tabular}
+\end{center}
+
+A execução dessa ação provoca um erro de casamento de padrão, na
+linha: \inh{IntVal i2 <- eval2 e2 env} (uma vez que \inh{e2} é uma
+lambda-abstração).
+
+That is fixed by pattern matching in Plus and App handling and explicitly throwing an appropriate error:
+
+eval2b                 :: Env -> Exp -> Eval2 Value
+eval2b env (Lit  i)     = return $ IntVal i
+eval2b env (Var  n)     = case Map.lookup n env of
+                              Nothing -> fail $ "unbound var: " ++ n
+                              Just v  -> return v
+eval2b env (Plus e1 e2) = do  e1'  <- eval2b env e1
+                              e2'  <- eval2b env e2
+                              -- eval2a / eval2b diff:
+                              case (e1', e2') of
+                                  (IntVal i1, IntVal i2) -> return $ IntVal (i1 + i2)
+                                  _                      -> throwError "type error in Plus"
+eval2b env (Abs  n  e)  = return $ FunVal env n e
+eval2b env (App  e1 e2) = do  val1  <- eval2b env e1
+                              val2  <- eval2b env e2
+                              -- eval2a / eval2b diff:
+                              case val1 of
+                                  FunVal env' n body -> eval2b (Map.insert n val2 env') body
+                                  _                  -> throwError "type error in App"
+
+The monadic structure enabled "throwing" the error without the need to thread that error return throughout the code. Instead, it is hidden and handled by the ErrorT monad.
+
+{-# LANGUAGE PackageImports #-}
+
+import           "mtl" Control.Monad.Identity
+import           "mtl" Control.Monad.Error
+import           "mtl" Control.Monad.Reader
+import           "mtl" Control.Monad.State
+import           "mtl" Control.Monad.Writer
+
+import                 Data.Maybe
+import qualified       Data.Map as Map
+
+type Name   =  String                -- variable names
+
+data Exp    =  Lit  Integer          -- expressions
+            |  Var  Name
+            |  Plus Exp  Exp
+            |  Abs  Name Exp
+            |  App  Exp  Exp
+            deriving (Eq, Show)
+
+data Value  =  IntVal Integer        -- values
+            |  FunVal Env Name Exp
+            deriving (Eq, Show)
+
+type Env    =  Map.Map Name Value    -- from names to values
+
+-- String is the type arg to ErrorT : the type of exceptions in example
+type Eval2 alpha = ErrorT String Identity alpha
+
+runEval2     :: Eval2 alpha -> Either String alpha
+runEval2 ev  = runIdentity (runErrorT ev)
+
+eval2b                 :: Env -> Exp -> Eval2 Value
+eval2b env (Lit  i)     = return $ IntVal i
+eval2b env (Var  n)     = case Map.lookup n env of
+                              Nothing -> fail $ "unbound var: " ++ n
+                              Just v  -> return v
+eval2b env (Plus e1 e2) = do  e1'  <- eval2b env e1
+                              e2'  <- eval2b env e2
+                              -- eval2a / eval2b diff:
+                              case (e1', e2') of
+                                  (IntVal i1, IntVal i2) -> return $ IntVal (i1 + i2)
+                                  _                      -> throwError "type error in Plus"
+eval2b env (Abs  n  e)  = return $ FunVal env n e
+eval2b env (App  e1 e2) = do  val1  <- eval2b env e1
+                              val2  <- eval2b env e2
+                              -- eval2a / eval2b diff:
+                              case val1 of
+                                  FunVal env' n body -> eval2b (Map.insert n val2 env') body
+                                  _                  -> throwError "type error in App"
+
+-- show
+main = do
+    putStrLn $ show $ runEval2 (eval2b Map.empty (Plus (Lit 12) (Abs "x" (Var "x"))))
+    -- ==> Left "type error in Plus"
+    putStrLn $ show $ runEval2 (eval2b Map.empty (App (Lit 12) (Lit 0)))
+    -- ==> Left "type error in App"
+-- /show
+
+hiding the environment
+
+The next change hides Env (via the ReaderT monad) since Env is only extended in App and used in Var and Abs.
+
+Notice how, for each successive evaluator (i.e., eval1, eval2, eval3), an additional monad is pushed onto the front of the "monad stack" used in the type of the evaluator. Likewise, the final value expression evaluation is obtained by removing each monad layer via runIdentity, runErrorT, runReaderT.
+
+{-# LANGUAGE PackageImports #-}
+
+import           "mtl" Control.Monad.Identity
+import           "mtl" Control.Monad.Error
+import           "mtl" Control.Monad.Reader
+import           "mtl" Control.Monad.State
+import           "mtl" Control.Monad.Writer
+
+import                 Data.Maybe
+import qualified       Data.Map as Map
+
+type Name   =  String                -- variable names
+
+data Exp    =  Lit  Integer          -- expressions
+            |  Var  Name
+            |  Plus Exp  Exp
+            |  Abs  Name Exp
+            |  App  Exp  Exp
+            deriving (Eq, Show)
+
+data Value  =  IntVal Integer        -- values
+            |  FunVal Env Name Exp
+            deriving (Eq, Show)
+
+type Env    =  Map.Map Name Value    -- from names to values
+
+exampleExp = Plus (Lit 12) (App (Abs "x" (Var "x")) (Plus (Lit 4) (Lit 2)))
+
+-- show
+type Eval3 alpha = ReaderT Env (ErrorT String Identity) alpha
+
+runEval3     :: Env -> Eval3 alpha -> Either String alpha
+runEval3 env ev  = runIdentity (runErrorT (runReaderT ev env))
+
+eval3             :: Exp -> Eval3 Value
+eval3 (Lit  i)     = return $ IntVal i
+eval3 (Var  n)     = do env <- ask                -- eval2b / eval3 diff
+                        case Map.lookup n env of
+                            Nothing  -> throwError ("unbound variable: " ++ n)
+                            Just val -> return val
+eval3 (Plus e1 e2) = do e1'  <- eval3 e1
+                        e2'  <- eval3 e2
+                        case (e1', e2') of
+                            (IntVal i1, IntVal i2) -> return $ IntVal (i1 + i2)
+                            _                      -> throwError "type error in Plus"
+eval3 (Abs  n  e)  = do env <- ask
+                        return $ FunVal env n e
+eval3 (App  e1 e2) = do val1  <- eval3 e1
+                        val2  <- eval3 e2
+                        case val1 of
+                                                  -- eval2b / eval3 diff
+                            FunVal env' n body -> local (const (Map.insert n val2 env')) (eval3 body)
+                            _                  -> throwError "type error in App"
+
+main = putStrLn $ show $ runEval3 Map.empty (eval3 exampleExp)
+       -- ==> Right (IntVal 18)
+-- /show
+
+In eval3, the ReaderT ask function is used to obtain Env in Var and Abs, and local is used to extend Env for the recursive call to eval3 in App. (Note: the local environment, in this case, does not depend on the current environment, so const is used.)
+
+Again, understanding the exact details mentioned here is not necessary. Instead, notice how the code only changed where Env is used. Nothing else changed (other than the type signature and not giving Env as an explicit parameter to eval3).
+adding state
+
+As an example of state, the evaluator is extended with "profiling" : an integer counting calls to the evaluator. The state added is not state like a mutable location in imperative languages. It is "effectful" — meaning updated values are seen after updating but no locations are mutated. How that happens is not covered in this article.
+
+The StateT monad is wrapped around the innermost monad Identity (order of State and Error matters).
+
+type Eval4 alpha = ReaderT Env (ErrorT String (StateT Integer Identity)) alpha
+
+-- returns evaluation result (error or value) and state
+-- give initial state arg for flexibility
+runEval4            ::  Env -> Integer -> Eval4 alpha -> (Either String alpha, Integer)
+runEval4 env st ev  =   runIdentity (runStateT (runErrorT (runReaderT ev env)) st)
+
+-- tick type not same as =Eval4= so it can reused elsewhere.
+tick :: (Num s, MonadState s m) => m ()
+tick = do  st <- get
+           put (st + 1)
+
+-- eval4          :: Exp -> Eval4 Value
+eval4 (Lit i)      = do tick
+                        return $ IntVal i
+eval4 (Var n)      = do tick
+                        env <- ask
+                        case Map.lookup n env of
+                            Nothing -> throwError ("unbound variable: " ++ n)
+                            Just val -> return val
+eval4 (Plus e1 e2) = do tick
+                        e1'  <- eval4 e1
+                        e2'  <- eval4 e2
+                        case (e1', e2') of
+                            (IntVal i1, IntVal i2) ->
+                                return $ IntVal (i1 + i2)
+                            _ -> throwError "type error in addition"
+eval4 (Abs n e)    = do tick
+                        env <- ask
+                        return $ FunVal env n e
+eval4 (App e1 e2)  = do tick
+                        val1  <- eval4 e1
+                        val2  <- eval4 e2
+                        case val1 of
+                            FunVal env' n body -> local (const (Map.insert n val2 env')) (eval4 body)
+                            _ -> throwError "type error in application"
+
+eval4 is identical to eval3 (other than the change in type signature) except each case starts by calling tick (and do is added to Lit).
+
+{-# LANGUAGE PackageImports #-}
+
+import           "mtl" Control.Monad.Identity
+import           "mtl" Control.Monad.Error
+import           "mtl" Control.Monad.Reader
+import           "mtl" Control.Monad.State
+import           "mtl" Control.Monad.Writer
+
+import                 Data.Maybe
+import qualified       Data.Map as Map
+
+type Name   =  String                -- variable names
+
+data Exp    =  Lit  Integer          -- expressions
+            |  Var  Name
+            |  Plus Exp  Exp
+            |  Abs  Name Exp
+            |  App  Exp  Exp
+            deriving (Eq, Show)
+
+data Value  =  IntVal Integer        -- values
+            |  FunVal Env Name Exp
+            deriving (Eq, Show)
+
+type Env    =  Map.Map Name Value    -- from names to values
+
+type Eval4 alpha = ReaderT Env (ErrorT String (StateT Integer Identity)) alpha
+
+-- returns evaluation result (error or value) and state
+-- give initial state arg for flexibility
+runEval4            ::  Env -> Integer -> Eval4 alpha -> (Either String alpha, Integer)
+runEval4 env st ev  =   runIdentity (runStateT (runErrorT (runReaderT ev env)) st)
+
+-- tick type not same as =Eval4= so it can reused elsewhere.
+tick :: (Num s, MonadState s m) => m ()
+tick = do  st <- get
+           put (st + 1)
+
+-- eval4          :: Exp -> Eval4 Value
+eval4 (Lit i)      = do tick
+                        return $ IntVal i
+eval4 (Var n)      = do tick
+                        env <- ask
+                        case Map.lookup n env of
+                            Nothing -> throwError ("unbound variable: " ++ n)
+                            Just val -> return val
+eval4 (Plus e1 e2) = do tick
+                        e1'  <- eval4 e1
+                        e2'  <- eval4 e2
+                        case (e1', e2') of
+                            (IntVal i1, IntVal i2) ->
+                                return $ IntVal (i1 + i2)
+                            _ -> throwError "type error in addition"
+eval4 (Abs n e)    = do tick
+                        env <- ask
+                        return $ FunVal env n e
+eval4 (App e1 e2)  = do tick
+                        val1  <- eval4 e1
+                        val2  <- eval4 e2
+                        case val1 of
+                            FunVal env' n body -> local (const (Map.insert n val2 env')) (eval4 body)
+                            _ -> throwError "type error in application"
+
+exampleExp = Plus (Lit 12) (App (Abs "x" (Var "x")) (Plus (Lit 4) (Lit 2)))
+
+-- show
+main = putStrLn $ show $ runEval4 Map.empty 0 (eval4 exampleExp)
+       -- (Right (IntVal 18),8) -- 8 reduction steps
+-- /show
+
+adding logging
+
+The evaluator is now extended to collect the name of each variable encountered during evaluation and return the collection when evaluation is done.
+
+That is done via the WriterT monad.
+
+(WriterT is a kind of a dual to ReaderT: WriterT can add (e.g., "write") values to result of computation, whereas ReaderT can only use (e.g., "read") values passed in.)
+
+type Eval5 alpha = ReaderT Env  (ErrorT String (WriterT [String] (StateT Integer Identity))) alpha
+
+runEval5            ::  Env -> Integer -> Eval5 alpha -> ((Either String alpha, [String]), Integer)
+runEval5 env st ev  =   runIdentity (runStateT (runWriterT (runErrorT (runReaderT ev env))) st)
+
+eval5             :: Exp -> Eval5 Value
+eval5 (Lit i)      = do tick
+                        return $ IntVal i
+eval5 (Var n)      = do tick
+                        -- eval4 / eval5 diff
+                        tell [n] -- collect name of each var encountered during evaluation
+                        env <- ask
+                        case Map.lookup n env of
+                            Nothing  -> throwError ("unbound variable: " ++ n)
+                            Just val -> return val
+eval5 (Plus e1 e2) = do tick
+                        e1'  <- eval5 e1
+                        e2'  <- eval5 e2
+                        case (e1', e2') of
+                            (IntVal i1, IntVal i2) -> return $ IntVal (i1 + i2)
+                            _                      -> throwError "type error in addition"
+eval5 (Abs n e)     = do tick
+                         env <- ask
+                         return $ FunVal env n e
+eval5 (App e1 e2)   = do tick
+                         val1  <- eval5 e1
+                         val2  <- eval5 e2
+                         case val1 of
+                             FunVal env' n body -> local (const (Map.insert n val2 env')) (eval5 body)
+                             _                  -> throwError "type error in application"
+
+The only change from eval4 to eval5 (besides type signature) is the usage of tell in Var handling.
+
+{-# LANGUAGE PackageImports #-}
+
+import           "mtl" Control.Monad.Identity
+import           "mtl" Control.Monad.Error
+import           "mtl" Control.Monad.Reader
+import           "mtl" Control.Monad.State
+import           "mtl" Control.Monad.Writer
+
+import                 Data.Maybe
+import qualified       Data.Map as Map
+
+type Name   =  String                -- variable names
+
+data Exp    =  Lit  Integer          -- expressions
+            |  Var  Name
+            |  Plus Exp  Exp
+            |  Abs  Name Exp
+            |  App  Exp  Exp
+            deriving (Eq, Show)
+
+data Value  =  IntVal Integer        -- values
+            |  FunVal Env Name Exp
+            deriving (Eq, Show)
+
+type Env    =  Map.Map Name Value    -- from names to values
+
+type Eval5 alpha = ReaderT Env  (ErrorT String (WriterT [String] (StateT Integer Identity))) alpha
+
+runEval5            ::  Env -> Integer -> Eval5 alpha -> ((Either String alpha, [String]), Integer)
+runEval5 env st ev  =   runIdentity (runStateT (runWriterT (runErrorT (runReaderT ev env))) st)
+
+-- tick type not same as =Eval4= so it can reused elsewhere.
+tick :: (Num s, MonadState s m) => m ()
+tick = do  st <- get
+           put (st + 1)
+
+
+eval5             :: Exp -> Eval5 Value
+eval5 (Lit i)      = do tick
+                        return $ IntVal i
+eval5 (Var n)      = do tick
+                        -- eval4 / eval5 diff
+                        tell [n] -- collect name of each var encountered during evaluation
+                        env <- ask
+                        case Map.lookup n env of
+                            Nothing  -> throwError ("unbound variable: " ++ n)
+                            Just val -> return val
+eval5 (Plus e1 e2) = do tick
+                        e1'  <- eval5 e1
+                        e2'  <- eval5 e2
+                        case (e1', e2') of
+                            (IntVal i1, IntVal i2) -> return $ IntVal (i1 + i2)
+                            _                      -> throwError "type error in addition"
+eval5 (Abs n e)     = do tick
+                         env <- ask
+                         return $ FunVal env n e
+eval5 (App e1 e2)   = do tick
+                         val1  <- eval5 e1
+                         val2  <- eval5 e2
+                         case val1 of
+                             FunVal env' n body -> local (const (Map.insert n val2 env')) (eval5 body)
+                             _                  -> throwError "type error in application"
+
+exampleExp = Plus (Lit 12) (App (Abs "x" (Var "x")) (Plus (Lit 4) (Lit 2)))
+
+-- show
+main = putStrLn $ show $ runEval5 Map.empty 0 (eval5 exampleExp)
+       -- ==> ((Right (IntVal 18),["x"]),8)
+-- /show
+
+At first, it may seem like magic that state, logging, etc., can suddenly be accessed even though they do not seem to appear as explicit parameters. The magic is in eval's type signature. It is a monad stack that is essentially a data structure (and more) being passed throughout eval. Therefore ask, tell, etc., can access the appropriate part of the stack when needed.
+
+(Aside: There is some "utility" magic in the monad transformers (mtl). Even though there is a stack of monads, and a function such as ask needs to operate on a specific monad in the stack (i.e., ReaderT), the monad transformer implementation "automatically" applies the function to the appropriate monad in the stack, rather than the main line code needing to explicitly access the right level.)
+IO
+
+The final extension is to add IO to the evaluator: eval6 will print the value of each Lit encountered during evaluation.
+
+type Eval6 alpha = ReaderT Env  (ErrorT String (WriterT [String] (StateT Integer IO))) alpha
+
+runEval6           ::  Env -> Integer -> Eval6 alpha -> IO ((Either String alpha, [String]), Integer)
+runEval6 env st ev  =  runStateT (runWriterT (runErrorT (runReaderT ev env))) st
+
+eval6             :: Exp -> Eval6 Value
+eval6 (Lit  i)     = do tick
+                        -- eval5 / eval 6 diff
+                        -- must use =liftIO= to lift into the currently running monad
+                        liftIO $ print i -- print each int when evaluated
+                        return $ IntVal i
+eval6 (Var  n)     = do tick
+                        tell [n]
+                        env <- ask
+                        case Map.lookup n env of
+                            Nothing  -> throwError ("unbound variable: " ++ n)
+                            Just val -> return val
+eval6 (Plus e1 e2) = do tick
+                        e1'  <- eval6 e1
+                        e2'  <- eval6 e2
+                        case (e1', e2') of
+                            (IntVal i1, IntVal i2) -> return $ IntVal (i1 + i2)
+                            _                      -> throwError "type error in addition"
+eval6 (Abs  n  e)  = do tick
+                        env <- ask
+                        return $ FunVal env n e
+eval6 (App  e1 e2) = do tick
+                        val1  <- eval6 e1
+                        val2  <- eval6 e2
+                        case val1 of
+                            FunVal env' n body -> local (const (Map.insert n val2 env')) (eval6 body)
+                            _                  -> throwError "type error in application"
+
+The only change from eval5 to eval6 (besides type signature) is the usage of liftIO ... in Lit handling.
+
+{-# LANGUAGE PackageImports #-}
+
+import           "mtl" Control.Monad.Identity
+import           "mtl" Control.Monad.Error
+import           "mtl" Control.Monad.Reader
+import           "mtl" Control.Monad.State
+import           "mtl" Control.Monad.Writer
+
+import                 Data.Maybe
+import qualified       Data.Map as Map
+
+type Name   =  String                -- variable names
+
+data Exp    =  Lit  Integer          -- expressions
+            |  Var  Name
+            |  Plus Exp  Exp
+            |  Abs  Name Exp
+            |  App  Exp  Exp
+            deriving (Eq, Show)
+
+data Value  =  IntVal Integer        -- values
+            |  FunVal Env Name Exp
+            deriving (Eq, Show)
+
+type Env    =  Map.Map Name Value    -- from names to values
+
+type Eval6 alpha = ReaderT Env  (ErrorT String (WriterT [String] (StateT Integer IO))) alpha
+
+runEval6           ::  Env -> Integer -> Eval6 alpha -> IO ((Either String alpha, [String]), Integer)
+runEval6 env st ev  =  runStateT (runWriterT (runErrorT (runReaderT ev env))) st
+
+-- tick type not same as =Eval4= so it can reused elsewhere.
+tick :: (Num s, MonadState s m) => m ()
+tick = do  st <- get
+           put (st + 1)
+
+
+eval6             :: Exp -> Eval6 Value
+eval6 (Lit  i)     = do tick
+                        -- eval5 / eval 6 diff
+                        -- must use =liftIO= to lift into the currently running monad
+                        liftIO $ print i -- print each int when evaluated
+                        return $ IntVal i
+eval6 (Var  n)     = do tick
+                        tell [n]
+                        env <- ask
+                        case Map.lookup n env of
+                            Nothing  -> throwError ("unbound variable: " ++ n)
+                            Just val -> return val
+eval6 (Plus e1 e2) = do tick
+                        e1'  <- eval6 e1
+                        e2'  <- eval6 e2
+                        case (e1', e2') of
+                            (IntVal i1, IntVal i2) -> return $ IntVal (i1 + i2)
+                            _                      -> throwError "type error in addition"
+eval6 (Abs  n  e)  = do tick
+                        env <- ask
+                        return $ FunVal env n e
+eval6 (App  e1 e2) = do tick
+                        val1  <- eval6 e1
+                        val2  <- eval6 e2
+                        case val1 of
+                            FunVal env' n body -> local (const (Map.insert n val2 env')) (eval6 body)
+                            _                  -> throwError "type error in application"
+
+exampleExp = Plus (Lit 12) (App (Abs "x" (Var "x")) (Plus (Lit 4) (Lit 2)))
+
+-- show
+main = runEval6 Map.empty 0 (eval6 exampleExp) >>= putStrLn . show
+       -- prints 12 4 2 on separate lines and returns:
+       -- ==> ((Right (IntVal 18),["x"]),8)
+-- /show
+
+summary
+
+The important point to see is that evaluators eval1 through eval6 all have the same structure. The only change between them is in the type signature and the usage of specific monad functions (e.g., ask, tell) to access data "in" the monad stack.
+
+The mechanics of how state, logging, environment hiding, handling errors, etc., are weaved through that structure are hidden inside the monad implementations (rather than cluttering the main program).
+
+
+
+
+
+
+   
+

@@ -1,0 +1,218 @@
+\documentclass[a4paper,10pt]{book}
+
+\usepackage{fancyheadings}
+
+%\usepackage{amsfonts}
+%\usepackage{amsmath}
+%\usepackage{amssymb}
+%\usepackage{amsthm}
+
+%\usepackage{proof}
+
+%\usepackage{psfig}
+\usepackage{fancybox}
+\usepackage{makeidx}
+
+\usepackage{graphicx}                               % graphics
+
+\usepackage{indentfirst}  % indentation at paragraph beggining
+%\usepackage{hyperref}     % for links in pdf and webpage
+\usepackage{makeidx}
+
+%-- hevea and page styling -------------------------
+\usepackage{hevea}
+\usepackage{hevea-epsfbox-def}  
+
+\usepackage{fancybox}
+\usepackage{fancyheadings}
+\usepackage{fancysection}            % hevea styling for sections
+
+\usepackage[utf8]{inputenc}
+\usepackage[portuguese]{babel}
+
+\usepackage[usenames,dvipsnames]{xcolor}
+
+
+%--- page style ----------------------------------
+\setlength{\headheight}{15.2pt}
+\pagestyle{fancyplain}
+\addtolength\headwidth{\marginparsep}
+\renewcommand{\chaptermark}[1]
+             {\markboth{#1}{}}
+\renewcommand{\sectionmark}[1]
+             {\markright{\thesection\ #1}}
+\lhead[\fancyplain{}{\sfseries\thepage}]
+     {\fancyplain{}{\sfseries\rightmark}}
+\rhead[\fancyplain{}{\sfseries\leftmark}]
+      {\fancyplain{}{\sfseries\thepage}}
+\cfoot{}
+
+%----- text format parameters -----
+\setlength\textwidth{150mm}
+\setlength\textheight{241mm}
+\setlength\oddsidemargin{5.4mm}
+\setlength\evensidemargin{5.4mm}
+\setlength\marginparsep{5mm}
+\setlength\marginparwidth{15mm}
+\addtolength\voffset{-5mm}
+\addtolength\topmargin{-3mm}
+\addtolength\headsep{2mm}
+\setlength\footskip{10mm}
+
+
+%- typesetting code -------------------------------
+\usepackage{listings}                                 
+
+%\lstset{
+    %frame=single,
+    %breaklines=true,
+%    postbreak=\raisebox{0ex}[0ex][0ex]{\ensuremath{\color{red}\hookrightarrow\space}}
+%}
+
+% estilo default de typesetting de código
+\newstyle{.myclisting}{font-family:monospace;white-space:pre;margin:lex;padding:2ex}
+
+% estilo para Haskell
+%OBS: a versao original de Haskell considera como 
+% keywords todas as definições do prelude.base
+\lstdefinestyle{mystyle}{
+  basicstyle={\tt},
+  backgroundcolor={\color{Cyan}},
+  keywordstyle={\bf \color{black}},
+  identifierstyle={\color{blue}},
+  commentstyle={\rm \it \color{DarkOrchid}},
+  emphstyle={{\bf \color{Mahogany}}},
+  xleftmargin=0pt,xrightmargin=0pt,
+  keepspaces={true},
+  showstringspaces=false,
+  stepnumber=1,
+  numbersep=5pt,
+  numberstyle={\tt \footnotesize \color{white}},
+  escapechar=!
+}
+
+\setenvclass{lstlisting}{myclisting}
+\lstset{style=mystyle}
+
+%\def\lst@lettertrue{\let\lst@ifletter\iffalse}
+
+%\definecolor{LightGray}{gray}{0.90}
+
+\lst@definelanguage{myHaskell}
+                  { %language={Haskell},
+                    style=mystyle,
+                    morekeywords={if,then,else,case,class,data,default,deriving,
+                      hiding,in,infix,infixl,infixr,import,instance,let,module,
+                      newtype,of,qualified,type,where,do}
+                  }
+
+\lstnewenvironment{alg}[2]{
+  \lstset{language=myHaskell,
+    backgroundcolor={\color{#2}},
+    basicstyle={\ttfamily},
+    keywordstyle={\bf \color{black}},
+    identifierstyle={\color{blue}},
+    commentstyle={\rm \it \color{DarkOrchid}},
+    emphstyle={{\bf \color{Mahogany}}},
+    keepspaces={true}}
+}
+{}
+
+\newcommand{\ina}{\lstinline[language=myHaskell]}
+
+\setcounter{tocdepth}{3}
+
+\title{Programa\c{c}\~ao em Haskell}
+
+\author{Carlos Camarão\\
+{\small Universidade Federal de Minas Gerais}\\
+{\small Doutor em Ci\^encia da Computa\c{c}\~ao pela Universidade de Manchester, Inglaterra}\\ \\
+Lucília Figueiredo\\
+{\small Universidade Federal de Ouro Preto}\\
+{\small Doutora em Ci\^encia da Computa\c{c}\~ao pela Universidade Federal de Minas Gerais}\\ \\
+Rodrigo Ribeiro\\
+{\small Universidade Federal de Ouro Preto}\\
+{\small Doutor em Ci\^encia da Computa\c{c}\~ao pela Universidade Federal de Minas Gerais}\\ \\
+Cristiano Vasconcellos\\
+{\small Universidade Estadual de Santa Catarina}\\
+{\small Doutor em Ci\^encia da Computa\c{c}\~ao pela Universidade Federal de Minas Gerais}}
+%\date{Febuary 25, 2015}
+\pagestyle{headings}
+
+\htmlhead{\sffamily\bfseries{Programação em Haskell}}
+
+\newcommand{\eqdef}{\overset{\text{def}}{=}}
+\newcommand{\und}{\textbf}
+
+\newcommand{\graybox}[1]{\begin{minipage}{\textwidth}\psboxit{box 0.95 setgray fill}{
+  {\spbox{#1}}}\end{minipage}}
+
+\makeindex
+\setcounter{tocdepth}{3}
+
+\setlength\textwidth{150mm}
+\setlength\textheight{241mm}
+\setlength\oddsidemargin{5.4mm}
+\setlength\evensidemargin{5.4mm}
+\addtolength\voffset{-5mm}
+\addtolength\topmargin{-3mm}
+\addtolength\headsep{2mm}
+\setlength\footskip{10mm}
+
+\pagestyle{fancyplain}
+\addtolength\headwidth{\marginparsep}
+\cfoot{}
+
+\begin{document}
+
+\maketitle
+
+\begin{tabular}{l}
+Direitos exclusivos\\
+Copyright \copyright\ 2009 by Carlos Camar\~ao, Lucília Figueiredo, Rodrigo Ribeiro e Cristiano Vasconcellos
+\end{tabular}
+
+\'E permitida a duplica\c{c}\~ao ou reprodu\c{c}\~ao, no todo ou em
+parte, sob quaisquer formas ou por quaisquer meios (eletr\^onico,
+mec\^anico, grava\c{c}\~ao, fotoc\'opia, distribui\c{c}\~ao na Web ou
+outros), desde que seja para fins n\~ao comerciais.
+
+\pagestyle{fancy}
+\pagenumbering{roman}
+%\setcounter{page}{5}
+
+\renewcommand{\chaptername}{Capítulo}
+\renewcommand{\tablename}{Tabela}
+\renewcommand{\figurename}{Figura}
+\renewcommand{\contentsname}{Conteúdo}
+\renewcommand{\indexname}{Índice}
+
+\tableofcontents
+
+\setcounter{secnumdepth}{-2}
+\input{meta.keys}
+
+\pagestyle{fancy}
+\setcounter{secnumdepth}{10}
+\pagenumbering{arabic}
+
+\input{prefacio}
+
+\input{tipos}
+
+%\input{funcoes-de-alta-ordem}
+
+%\input{correcao}
+  
+\input{fold}
+
+\input{monads}	
+
+\pagestyle{fancyplain}
+
+\bibliographystyle{plain}
+\bibliography{livro}
+
+\printindex
+
+\end{document}
